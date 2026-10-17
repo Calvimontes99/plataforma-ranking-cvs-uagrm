@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: ms-vacantes
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/vacancies_db}
+    username: ${DB_USER:vacancies_user}
+    password: ${DB_PASSWORD:vacancies_dev}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:platform_user}
+    password: ${RABBITMQ_PASSWORD:platform_dev}
+    virtual-host: ${RABBITMQ_VHOST:recruitment}
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${JWT_ISSUER_URI:http://localhost:8081/auth/realms/recruitment}
+          jwk-set-uri: ${JWT_JWK_SET_URI:http://localhost:8081/auth/realms/recruitment/protocol/openid-connect/certs}
+  graphql:
+    graphiql:
+      enabled: ${GRAPHIQL_ENABLED:true}
+
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+grpc:
+  server:
+    port: ${GRPC_PORT:9090}
+
+outbox:
+  exchange: ${OUTBOX_EXCHANGE:recruitment.events}
+  poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
+  batch-size: ${OUTBOX_BATCH_SIZE:100}
+
+logging:
+  pattern:
+    level: "%5p [correlationId:%X{correlationId:-}]"

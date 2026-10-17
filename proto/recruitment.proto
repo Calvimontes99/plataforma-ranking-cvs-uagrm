@@ -1,0 +1,431 @@
+syntax = "proto3";
+
+package recruitment.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option java_multiple_files = true;
+option java_package = "com.recruitment.platform.grpc.v1";
+option java_outer_classname = "RecruitmentProto";
+option php_namespace = "Recruitment\\V1";
+option php_metadata_namespace = "Recruitment\\GPBMetadata";
+
+// Shared request context propagated across REST, events and gRPC calls.
+message RequestContext {
+  string correlation_id = 1;
+  string causation_id = 2;
+  string idempotency_key = 3;
+  string actor_id = 4;
+  string tenant_id = 5;
+  map<string, string> attributes = 6;
+}
+
+message PageRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ErrorDetail {
+  string code = 1;
+  string message = 2;
+  string field = 3;
+  map<string, string> metadata = 4;
+}
+
+enum DocumentType {
+  DOCUMENT_TYPE_UNSPECIFIED = 0;
+  DOCUMENT_TYPE_CV = 1;
+  DOCUMENT_TYPE_CERTIFICATE = 2;
+  DOCUMENT_TYPE_COVER_LETTER = 3;
+  DOCUMENT_TYPE_VIDEO_CV = 4;
+}
+
+enum ApplicationStatus {
+  APPLICATION_STATUS_UNSPECIFIED = 0;
+  APPLICATION_STATUS_RECEIVED = 1;
+  APPLICATION_STATUS_PROCESSING = 2;
+  APPLICATION_STATUS_EVALUATED = 3;
+  APPLICATION_STATUS_PREAPPROVED = 4;
+  APPLICATION_STATUS_SELECTED = 5;
+  APPLICATION_STATUS_REJECTED = 6;
+  APPLICATION_STATUS_LOCKED = 7;
+  APPLICATION_STATUS_WITHDRAWN = 8;
+}
+
+enum VacancyStatus {
+  VACANCY_STATUS_UNSPECIFIED = 0;
+  VACANCY_STATUS_DRAFT = 1;
+  VACANCY_STATUS_OPEN = 2;
+  VACANCY_STATUS_PAUSED = 3;
+  VACANCY_STATUS_FILLED = 4;
+  VACANCY_STATUS_CLOSED = 5;
+}
+
+enum SagaStepStatus {
+  SAGA_STEP_STATUS_UNSPECIFIED = 0;
+  SAGA_STEP_STATUS_ACCEPTED = 1;
+  SAGA_STEP_STATUS_COMPLETED = 2;
+  SAGA_STEP_STATUS_REJECTED = 3;
+  SAGA_STEP_STATUS_COMPENSATED = 4;
+}
+
+message Candidate {
+  string candidate_id = 1;
+  string full_name = 2;
+  string email = 3;
+  string phone = 4;
+  string locale = 5;
+}
+
+message Skill {
+  string name = 1;
+  double proficiency = 2;
+  int32 years_experience = 3;
+}
+
+message Education {
+  string institution = 1;
+  string degree = 2;
+  string field_of_study = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+}
+
+message WorkExperience {
+  string company = 1;
+  string role = 2;
+  string description = 3;
+  google.protobuf.Timestamp start_date = 4;
+  google.protobuf.Timestamp end_date = 5;
+  repeated string technologies = 6;
+}
+
+message ParsedResume {
+  string resume_id = 1;
+  string candidate_id = 2;
+  string plain_text = 3;
+  repeated Skill skills = 4;
+  repeated Education education = 5;
+  repeated WorkExperience experience = 6;
+  repeated string languages = 7;
+  google.protobuf.Struct additional_data = 8;
+  google.protobuf.Timestamp parsed_at = 9;
+}
+
+message DocumentChunk {
+  RequestContext context = 1;
+  string upload_id = 2;
+  string candidate_id = 3;
+  string vacancy_id = 4;
+  string file_name = 5;
+  string content_type = 6;
+  DocumentType document_type = 7;
+  bytes data = 8;
+  int32 sequence = 9;
+  bool last_chunk = 10;
+  string sha256 = 11;
+}
+
+message IngestDocumentResponse {
+  string application_id = 1;
+  string resume_id = 2;
+  ApplicationStatus status = 3;
+  google.protobuf.Timestamp received_at = 4;
+  repeated ErrorDetail warnings = 5;
+}
+
+message GetResumeRequest {
+  RequestContext context = 1;
+  string resume_id = 2;
+}
+
+message GetApplicationRequest {
+  RequestContext context = 1;
+  string application_id = 2;
+}
+
+message ApplicationRecord {
+  string application_id = 1;
+  string vacancy_id = 2;
+  Candidate candidate = 3;
+  string resume_id = 4;
+  ApplicationStatus status = 5;
+  bool expediente_locked = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message LockCandidateFileRequest {
+  RequestContext context = 1;
+  string saga_id = 2;
+  string candidate_id = 3;
+  string selected_application_id = 4;
+  string selected_vacancy_id = 5;
+  string reason = 6;
+}
+
+message LockCandidateFileResponse {
+  string saga_id = 1;
+  SagaStepStatus status = 2;
+  repeated string withdrawn_application_ids = 3;
+  google.protobuf.Timestamp completed_at = 4;
+  repeated ErrorDetail errors = 5;
+}
+
+message UnlockCandidateFileRequest {
+  RequestContext context = 1;
+  string saga_id = 2;
+  string candidate_id = 3;
+  repeated string restore_application_ids = 4;
+  string reason = 5;
+}
+
+message SagaStepResponse {
+  string saga_id = 1;
+  SagaStepStatus status = 2;
+  google.protobuf.Timestamp completed_at = 3;
+  repeated ErrorDetail errors = 4;
+}
+
+message Vacancy {
+  string vacancy_id = 1;
+  string department_id = 2;
+  string title = 3;
+  string description = 4;
+  repeated Skill required_skills = 5;
+  repeated string preferred_skills = 6;
+  int32 total_slots = 7;
+  int32 available_slots = 8;
+  VacancyStatus status = 9;
+  google.protobuf.Timestamp opened_at = 10;
+  google.protobuf.Timestamp closes_at = 11;
+}
+
+message GetVacancyRequest {
+  RequestContext context = 1;
+  string vacancy_id = 2;
+}
+
+message ListOpenVacanciesRequest {
+  RequestContext context = 1;
+  string department_id = 2;
+  PageRequest page = 3;
+}
+
+message ListOpenVacanciesResponse {
+  repeated Vacancy vacancies = 1;
+  string next_page_token = 2;
+}
+
+message PreapproveCandidateRequest {
+  RequestContext context = 1;
+  string vacancy_id = 2;
+  string application_id = 3;
+  string candidate_id = 4;
+  double score = 5;
+  string ranking_id = 6;
+}
+
+message PreapproveCandidateResponse {
+  string preapproval_id = 1;
+  ApplicationStatus status = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message CreateContractRequest {
+  RequestContext context = 1;
+  string saga_id = 2;
+  string vacancy_id = 3;
+  string application_id = 4;
+  string candidate_id = 5;
+  google.protobuf.Struct contract_terms = 6;
+}
+
+message CreateContractResponse {
+  string saga_id = 1;
+  string contract_id = 2;
+  int32 remaining_slots = 3;
+  SagaStepStatus status = 4;
+  google.protobuf.Timestamp created_at = 5;
+  repeated ErrorDetail errors = 6;
+}
+
+message ScoreBreakdown {
+  double skills_score = 1;
+  double experience_score = 2;
+  double education_score = 3;
+  double semantic_score = 4;
+  double model_score = 5;
+  map<string, double> custom_scores = 6;
+}
+
+message EvaluateApplicationRequest {
+  RequestContext context = 1;
+  string application_id = 2;
+  string vacancy_id = 3;
+  ParsedResume resume = 4;
+  Vacancy vacancy = 5;
+  repeated float embedding = 6;
+  string model_version = 7;
+}
+
+message RankingResult {
+  string ranking_id = 1;
+  string application_id = 2;
+  string vacancy_id = 3;
+  string candidate_id = 4;
+  double score = 5;
+  ScoreBreakdown breakdown = 6;
+  int32 position = 7;
+  string model_version = 8;
+  google.protobuf.Timestamp evaluated_at = 9;
+}
+
+message GetRankingRequest {
+  RequestContext context = 1;
+  string vacancy_id = 2;
+  PageRequest page = 3;
+}
+
+message GetRankingResponse {
+  repeated RankingResult results = 1;
+  string next_page_token = 2;
+  google.protobuf.Timestamp generated_at = 3;
+}
+
+message SelectCandidateRequest {
+  RequestContext context = 1;
+  string saga_id = 2;
+  string ranking_id = 3;
+  string application_id = 4;
+  string vacancy_id = 5;
+  string candidate_id = 6;
+}
+
+message RevertCandidateSelectionRequest {
+  RequestContext context = 1;
+  string saga_id = 2;
+  string ranking_id = 3;
+  string reason = 4;
+}
+
+message ExtractDocumentRequest {
+  RequestContext context = 1;
+  string document_id = 2;
+  DocumentType document_type = 3;
+  string content_type = 4;
+  bytes content = 5;
+  string object_uri = 6;
+  string language_hint = 7;
+}
+
+message ExtractDocumentResponse {
+  string document_id = 1;
+  string extracted_text = 2;
+  double confidence = 3;
+  repeated ErrorDetail warnings = 4;
+  string model_version = 5;
+  repeated Skill skills = 6;
+  repeated Education education = 7;
+  repeated WorkExperience experience = 8;
+  google.protobuf.Struct additional_data = 9;
+}
+
+message GenerateEmbeddingRequest {
+  RequestContext context = 1;
+  string subject_id = 2;
+  string text = 3;
+  string model = 4;
+}
+
+message GenerateEmbeddingResponse {
+  string subject_id = 1;
+  repeated float vector = 2;
+  int32 dimensions = 3;
+  string model_version = 4;
+}
+
+message PredictCompatibilityRequest {
+  RequestContext context = 1;
+  string application_id = 2;
+  ParsedResume resume = 3;
+  Vacancy vacancy = 4;
+  repeated float resume_embedding = 5;
+  repeated float vacancy_embedding = 6;
+}
+
+message PredictCompatibilityResponse {
+  double score = 1;
+  ScoreBreakdown breakdown = 2;
+  string explanation = 3;
+  string model_version = 4;
+}
+
+message ClusterTalentRequest {
+  RequestContext context = 1;
+  repeated TalentVector talents = 2;
+  int32 cluster_count = 3;
+}
+
+message TalentVector {
+  string candidate_id = 1;
+  repeated float vector = 2;
+}
+
+message TalentCluster {
+  string candidate_id = 1;
+  int32 cluster_id = 2;
+  double distance_to_centroid = 3;
+}
+
+message ClusterTalentResponse {
+  repeated TalentCluster assignments = 1;
+  string model_version = 2;
+}
+
+message HealthResponse {
+  string service = 1;
+  string status = 2;
+  string version = 3;
+  google.protobuf.Timestamp checked_at = 4;
+}
+
+// Hexagonal ingestion boundary: stores documents and owns candidate files.
+service IngestionService {
+  rpc IngestDocument(stream DocumentChunk) returns (IngestDocumentResponse);
+  rpc GetResume(GetResumeRequest) returns (ParsedResume);
+  rpc GetApplication(GetApplicationRequest) returns (ApplicationRecord);
+  rpc LockCandidateFile(LockCandidateFileRequest) returns (LockCandidateFileResponse);
+  rpc UnlockCandidateFile(UnlockCandidateFileRequest) returns (SagaStepResponse);
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}
+
+// Clean Architecture ranking boundary and first participant in the hiring SAGA.
+service RankingService {
+  rpc EvaluateApplication(EvaluateApplicationRequest) returns (RankingResult);
+  rpc GetVacancyRanking(GetRankingRequest) returns (GetRankingResponse);
+  rpc StreamVacancyRanking(GetRankingRequest) returns (stream RankingResult);
+  rpc SelectCandidate(SelectCandidateRequest) returns (SagaStepResponse);
+  rpc RevertCandidateSelection(RevertCandidateSelectionRequest) returns (SagaStepResponse);
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}
+
+// DDD vacancies boundary and final participant in the hiring SAGA.
+service VacancyService {
+  rpc GetVacancy(GetVacancyRequest) returns (Vacancy);
+  rpc ListOpenVacancies(ListOpenVacanciesRequest) returns (ListOpenVacanciesResponse);
+  rpc PreapproveCandidate(PreapproveCandidateRequest) returns (PreapproveCandidateResponse);
+  rpc CreateContract(CreateContractRequest) returns (CreateContractResponse);
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}
+
+// AI inference boundary consumed by ingestion and ranking.
+service AiService {
+  rpc ExtractDocument(ExtractDocumentRequest) returns (ExtractDocumentResponse);
+  rpc GenerateEmbedding(GenerateEmbeddingRequest) returns (GenerateEmbeddingResponse);
+  rpc PredictCompatibility(PredictCompatibilityRequest) returns (PredictCompatibilityResponse);
+  rpc ClusterTalent(ClusterTalentRequest) returns (ClusterTalentResponse);
+  rpc Health(google.protobuf.Empty) returns (HealthResponse);
+}

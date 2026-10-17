@@ -1,0 +1,63 @@
+{
+  "realm": "recruitment",
+  "enabled": true,
+  "displayName": "Recruitment Platform",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "roles": {
+    "realm": [
+      { "name": "RRHH" },
+      { "name": "AI_AGENT" }
+    ]
+  },
+  "clientScopes": [
+    { "name": "vacancies:read", "protocol": "openid-connect", "attributes": { "include.in.token.scope": "true" } },
+    { "name": "vacancies:write", "protocol": "openid-connect", "attributes": { "include.in.token.scope": "true" } },
+    { "name": "mcp:execute", "protocol": "openid-connect", "attributes": { "include.in.token.scope": "true" } }
+  ],
+  "clients": [
+    {
+      "clientId": "erp-web",
+      "name": "ERP React",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:3000/*", "http://localhost:8080/*"],
+      "webOrigins": ["http://localhost:3000", "http://localhost:8080"],
+      "defaultClientScopes": ["vacancies:read", "vacancies:write", "mcp:execute"]
+    },
+    {
+      "clientId": "recruitment-frontends",
+      "name": "Portal público Vue",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": ["http://localhost:8080/portal/*"],
+      "webOrigins": ["http://localhost:8080"]
+    }
+  ],
+  "users": [
+    {
+      "username": "rrhh.demo",
+      "email": "rrhh.demo@recruitment.local",
+      "firstName": "María",
+      "lastName": "RRHH",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Demo123!", "temporary": false }],
+      "realmRoles": ["RRHH", "AI_AGENT"]
+    },
+    {
+      "username": "docente.demo",
+      "email": "docente.demo@recruitment.local",
+      "firstName": "Docente",
+      "lastName": "Evaluador",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [{ "type": "password", "value": "Demo123!", "temporary": false }],
+      "realmRoles": ["RRHH"]
+    }
+  ]
+}

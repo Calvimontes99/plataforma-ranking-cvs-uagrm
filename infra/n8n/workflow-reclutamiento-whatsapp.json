@@ -1,0 +1,61 @@
+{
+  "name": "Reclutamiento WhatsApp - CV a entrevista",
+  "nodes": [
+    {
+      "parameters": { "httpMethod": "POST", "path": "whatsapp-cv", "responseMode": "responseNode", "options": {} },
+      "id": "webhook-whatsapp", "name": "1. Webhook WhatsApp CV", "type": "n8n-nodes-base.webhook", "typeVersion": 2, "position": [0, 300],
+      "notes": "Recibe candidateId, vacancyId, nombre, email, telefono y resume desde el proveedor WhatsApp."
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "http://ms-ingesta:3000/api/v1/ingestion/whatsapp", "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Idempotency-Key", "value": "={{ $json.headers?.['x-message-id'] || $json.body?.messageId || $now.toMillis().toString() }}" }] },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={\"candidateId\": $json.body.candidateId, \"vacancyId\": $json.body.vacancyId, \"channel\": \"whatsapp\", \"applicant\": {\"name\": $json.body.nombre, \"email\": $json.body.email, \"phone\": $json.body.telefono}, \"resume\": $json.body.resume}", "options": {}
+      },
+      "id": "ingest-cv", "name": "2. Ingestar y parsear CV", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "http://ms-ranking:8000/api/v1/ranking/evaluate", "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Idempotency-Key", "value": "={{ $json.applicationId }}" }] },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={\"vacancyId\": $json.vacancyId, \"candidateId\": $json.candidateId, \"resumeId\": $json.resumeId, \"applicationId\": $json.applicationId, \"resume\": $json.parsedResume || {}, \"vacancy\": {\"vacancyId\": $json.vacancyId}}", "options": {}
+      },
+      "id": "rank-cv", "name": "3. Ranking + AI ML", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [480, 300]
+    },
+    {
+      "parameters": { "conditions": { "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" }, "conditions": [{ "id": "score-rule", "leftValue": "={{ $json.score }}", "rightValue": 85, "operator": { "type": "number", "operation": "gte" } }], "combinator": "and" }, "options": {} },
+      "id": "score-if", "name": "4. IF score >= 85", "type": "n8n-nodes-base.if", "typeVersion": 2.2, "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST", "url": "http://ms-vacantes:8080/graphql", "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.N8N_SERVICE_TOKEN }}" }] },
+        "sendBody": true, "specifyBody": "json", "jsonBody": "={\"query\":\"mutation Preapprove($input: RegistrarPreAprobacionInput!) { registrarPreAprobacion(input: $input) { id score } }\",\"variables\":{\"input\":{\"vacanteId\":$json.vacancyId,\"postulacionId\":$json.applicationId,\"candidatoId\":$json.candidateId,\"rankingId\":$json.rankingId,\"score\":$json.score}}}", "options": {}
+      },
+      "id": "preapprove", "name": "5. Registrar pre-aprobación", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [960, 220]
+    },
+    {
+      "parameters": { "fromEmail": "rrhh@example.com", "toEmail": "={{ $('1. Webhook WhatsApp CV').item.json.body.email }}", "subject": "Invitación a entrevista", "emailFormat": "text", "text": "=Hola {{ $('1. Webhook WhatsApp CV').item.json.body.nombre }}, tu CV fue pre-aprobado. Entrevista: {{ $now.plus({days: 2}).toFormat('dd/LL/yyyy HH:mm') }}. Link: https://meet.example.com/recruitment", "options": {} },
+      "id": "email", "name": "6a. Email SMTP", "type": "n8n-nodes-base.emailSend", "typeVersion": 2.1, "position": [1200, 160], "credentials": { "smtp": { "id": "CONFIGURE_SMTP", "name": "SMTP RRHH" } }
+    },
+    {
+      "parameters": { "method": "POST", "url": "={{ $env.WHATSAPP_API_URL || 'https://graph.facebook.com/v20.0/messages' }}", "sendHeaders": true, "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.WHATSAPP_TOKEN }}" }] }, "sendBody": true, "specifyBody": "json", "jsonBody": "={\"to\":$('1. Webhook WhatsApp CV').item.json.body.telefono,\"type\":\"text\",\"text\":{\"body\":\"¡CV pre-aprobado! Te esperamos en entrevista. Revisa tu correo.\"}}", "options": {} },
+      "id": "whatsapp", "name": "6b. Notificar WhatsApp", "type": "n8n-nodes-base.httpRequest", "typeVersion": 4.2, "position": [1440, 160]
+    },
+    { "parameters": { "respondWith": "json", "responseBody": "={\"accepted\": true, \"workflow\": \"recruitment-whatsapp\"}", "options": {} }, "id": "respond", "name": "Responder Webhook", "type": "n8n-nodes-base.respondToWebhook", "typeVersion": 1.4, "position": [1680, 300] }
+  ],
+  "connections": {
+    "1. Webhook WhatsApp CV": { "main": [[{ "node": "2. Ingestar y parsear CV", "type": "main", "index": 0 }]] },
+    "2. Ingestar y parsear CV": { "main": [[{ "node": "3. Ranking + AI ML", "type": "main", "index": 0 }]] },
+    "3. Ranking + AI ML": { "main": [[{ "node": "4. IF score >= 85", "type": "main", "index": 0 }]] },
+    "4. IF score >= 85": { "main": [[{ "node": "5. Registrar pre-aprobación", "type": "main", "index": 0 }],[{ "node": "Responder Webhook", "type": "main", "index": 0 }]] },
+    "5. Registrar pre-aprobación": { "main": [[{ "node": "6a. Email SMTP", "type": "main", "index": 0 }]] },
+    "6a. Email SMTP": { "main": [[{ "node": "6b. Notificar WhatsApp", "type": "main", "index": 0 }]] },
+    "6b. Notificar WhatsApp": { "main": [[{ "node": "Responder Webhook", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1", "saveManualExecutions": true },
+  "versionId": "638ad3bd-53a2-4abe-a5a5-3fc6929d39ac",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": []
+}

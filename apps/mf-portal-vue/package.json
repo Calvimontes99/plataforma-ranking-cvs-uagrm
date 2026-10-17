@@ -1,0 +1,1 @@
+{"name":"mf-portal-vue","private":true,"version":"1.0.0","type":"module","scripts":{"dev":"vite","build":"vue-tsc -b && vite build","preview":"vite preview"},"dependencies":{"keycloak-js":"^26.0.7","vue":"^3.5.12"},"devDependencies":{"@vitejs/plugin-vue":"^5.2.0","typescript":"~5.6.3","vite":"^5.4.10","vue-tsc":"^2.1.10"}}

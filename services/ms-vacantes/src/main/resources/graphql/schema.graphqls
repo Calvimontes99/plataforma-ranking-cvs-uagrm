@@ -1,0 +1,76 @@
+type Query {
+  vacante(id: ID!): Vacante
+  vacantesAbiertas(departamentoId: ID, limite: Int = 20): [Vacante!]!
+  postulantesPreaprobados(vacanteId: ID!): [PreAprobacion!]!
+}
+
+type Mutation {
+  crearVacante(input: CrearVacanteInput!): Vacante!
+  registrarPreAprobacion(input: RegistrarPreAprobacionInput!): PreAprobacion!
+  adjudicarVacante(input: AdjudicarVacanteInput!): ResultadoAdjudicacion!
+}
+
+type Vacante {
+  id: ID!
+  departamentoId: ID!
+  titulo: String!
+  descripcion: String!
+  cupoTotal: Int!
+  cupoDisponible: Int!
+  salarioPresupuestado: Float!
+  moneda: String!
+  estado: EstadoVacante!
+  habilidadesRequeridas: [String!]!
+  habilidadesPreferidas: [String!]!
+  fechaApertura: String
+  fechaCierre: String
+}
+
+type PreAprobacion {
+  id: ID!
+  vacanteId: ID!
+  postulacionId: ID!
+  candidatoId: ID!
+  rankingId: ID!
+  score: Float!
+  nombreCompleto: String!
+  puntajeRanking: Float!
+  pretensionSalarial: Float
+  creadaEn: String!
+}
+
+type ResultadoAdjudicacion {
+  sagaId: ID!
+  contratoId: ID!
+  cuposRestantes: Int!
+}
+
+enum EstadoVacante { BORRADOR ABIERTA PAUSADA CUBIERTA CERRADA }
+
+input CrearVacanteInput {
+  departamentoId: ID!
+  titulo: String!
+  descripcion: String!
+  cupoTotal: Int!
+  salarioPresupuestado: Float!
+  moneda: String!
+  habilidadesRequeridas: [String!] = []
+  habilidadesPreferidas: [String!] = []
+  fechaCierre: String
+}
+
+input RegistrarPreAprobacionInput {
+  vacanteId: ID!
+  postulacionId: ID!
+  candidatoId: ID!
+  rankingId: ID!
+  score: Float!
+}
+
+input AdjudicarVacanteInput {
+  sagaId: ID!
+  vacanteId: ID!
+  postulacionId: ID!
+  candidatoId: ID!
+  terminos: String!
+}

@@ -1,0 +1,16 @@
+fastapi==0.115.12
+pydantic==2.10.6
+uvicorn[standard]==0.34.0
+grpcio==1.71.0
+grpcio-tools==1.71.0
+protobuf>=5.26.1,<6
+httpx==0.28.1
+numpy>=1.26.4,<2
+scikit-learn==1.6.1
+tensorflow-cpu==2.18.0
+pypdf==5.4.0
+pypdfium2==4.30.0
+pytesseract==0.3.13
+av==14.2.0
+Pillow==11.1.0
+opencv-python-headless==4.11.0.86

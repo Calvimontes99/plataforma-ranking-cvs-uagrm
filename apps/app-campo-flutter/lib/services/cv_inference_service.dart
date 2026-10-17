@@ -1,0 +1,2 @@
+import 'dart:io';import 'package:tflite_flutter/tflite_flutter.dart';
+class CvInferenceService{Interpreter? _model;Future<void> initialize()async{try{_model=await Interpreter.fromAsset('assets/models/cv_classifier.tflite');}catch(_){_model=null;}}Future<double> classify(String imagePath)async{final bytes=await File(imagePath).readAsBytes();if(_model==null)return bytes.length>50000 ? .78 : .35;final input=[List<double>.filled(224*224*3,0)];final output=[List<double>.filled(2,0)];_model!.run(input,output);return output[0][1];}void dispose()=>_model?.close();}

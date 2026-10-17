@@ -1,0 +1,409 @@
+name: recruitment-platform
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: recruitment-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-platform_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:-platform_admin_dev}
+      POSTGRES_DB: ${POSTGRES_DEFAULT_DB:-postgres}
+      VACANCIES_DB: ${VACANCIES_DB:-vacancies_db}
+      VACANCIES_DB_USER: ${VACANCIES_DB_USER:-vacancies_user}
+      VACANCIES_DB_PASSWORD: ${VACANCIES_DB_PASSWORD:-vacancies_dev}
+      CQRS_DB: ${CQRS_DB:-recruitment_read_db}
+      CQRS_DB_USER: ${CQRS_DB_USER:-cqrs_read_user}
+      CQRS_DB_PASSWORD: ${CQRS_DB_PASSWORD:-cqrs_read_dev}
+      CQRS_READONLY_DB_USER: ${CQRS_READONLY_DB_USER:-cqrs_report_user}
+      CQRS_READONLY_DB_PASSWORD: ${CQRS_READONLY_DB_PASSWORD:-cqrs_report_dev}
+      KEYCLOAK_DB: ${KEYCLOAK_DB:-keycloak_db}
+      KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:-keycloak_user}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_dev}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [backend]
+
+  mongodb:
+    image: mongo:7-jammy
+    container_name: recruitment-mongodb
+    restart: unless-stopped
+    command:
+      - bash
+      - -lc
+      - >-
+        if [ ! -f /data/configdb/repl.key ]; then openssl rand -base64 756 > /data/configdb/repl.key; fi &&
+        chown mongodb:mongodb /data/configdb/repl.key &&
+        chmod 400 /data/configdb/repl.key &&
+        exec /usr/local/bin/docker-entrypoint.sh mongod --replSet rs0 --bind_ip_all --keyFile /data/configdb/repl.key
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-platform_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-platform_admin_dev}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-ingestion_db}
+    ports:
+      - "${MONGO_PORT:-27017}:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config_data:/data/configdb
+    healthcheck:
+      test: ["CMD-SHELL", "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongodb:27017'}]}).ok }\" --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [backend]
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.6.1
+    container_name: recruitment-dynamodb
+    restart: unless-stopped
+    user: "0:0"
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/home/dynamodblocal/data"]
+    ports:
+      - "${DYNAMODB_PORT:-8000}:8000"
+    volumes:
+      - dynamodb_data:/home/dynamodblocal/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS --max-time 3 -X POST -H 'Content-Type: application/x-amz-json-1.0' -H 'X-Amz-Target: DynamoDB_20120810.ListTables' -H 'X-Amz-Date: 20200101T000000Z' -H 'Authorization: AWS4-HMAC-SHA256 Credential=local/20200101/us-east-1/dynamodb/aws4_request, SignedHeaders=host;x-amz-date;x-amz-target, Signature=0000000000000000000000000000000000000000000000000000000000000000' -d '{}' http://127.0.0.1:8000/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks: [backend]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: recruitment-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-platform_user}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-platform_dev}
+      RABBITMQ_DEFAULT_VHOST: ${RABBITMQ_VHOST:-recruitment}
+    ports:
+      - "${RABBITMQ_AMQP_PORT:-5672}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT:-15672}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [backend]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0.7
+    container_name: recruitment-keycloak
+    restart: unless-stopped
+    command: ["start-dev", "--health-enabled=true", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin_dev}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/${KEYCLOAK_DB:-keycloak_db}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER:-keycloak_user}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_dev}
+      KC_HTTP_ENABLED: "true"
+      KC_HTTP_RELATIVE_PATH: /auth
+      KC_PROXY_HEADERS: xforwarded
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "${KEYCLOAK_PORT:-8081}:8080"
+    volumes:
+      - ./keycloak/realm-recruitment.json:/opt/keycloak/data/import/realm-recruitment.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 3 bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000'"]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    networks: [backend]
+
+  ms-vacantes:
+    build:
+      context: ..
+      dockerfile: services/ms-vacantes/Dockerfile
+    container_name: recruitment-ms-vacantes
+    restart: unless-stopped
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${VACANCIES_DB:-vacancies_db}
+      DB_USER: ${VACANCIES_DB_USER:-vacancies_user}
+      DB_PASSWORD: ${VACANCIES_DB_PASSWORD:-vacancies_dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-platform_user}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-platform_dev}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-recruitment}
+      JWT_ISSUER_URI: ${JWT_ISSUER_URI:-http://localhost:8080/auth/realms/recruitment}
+      JWT_JWK_SET_URI: http://keycloak:8080/auth/realms/recruitment/protocol/openid-connect/certs
+      GRAPHIQL_ENABLED: "false"
+    ports:
+      - "${VACANCIES_HTTP_PORT:-8082}:8080"
+      - "${VACANCIES_GRPC_PORT:-9090}:9090"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/vacancies/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks: [backend]
+
+  ms-ingesta:
+    build:
+      context: ..
+      dockerfile: services/ms-ingesta/Dockerfile
+    container_name: recruitment-ms-ingesta
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      GRPC_PORT: 9091
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER:-platform_admin}:${MONGO_ROOT_PASSWORD:-platform_admin_dev}@mongodb:27017/${MONGO_DATABASE:-ingestion_db}?authSource=admin&replicaSet=rs0
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-platform_user}:${RABBITMQ_PASSWORD:-platform_dev}@rabbitmq:5672/${RABBITMQ_VHOST:-recruitment}
+      RABBITMQ_EXCHANGE: recruitment.events
+      RABBITMQ_SAGA_QUEUE: ingesta.saga.commands
+      AI_NODE_GRPC_URL: ${AI_NODE_GRPC_URL:-ai-node:50051}
+      MS_RANKING_GRPC_URL: ${MS_RANKING_GRPC_URL:-ms-ranking:50052}
+      OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-1000}
+    ports:
+      - "${INGESTION_HTTP_PORT:-3000}:3000"
+      - "${INGESTION_GRPC_PORT:-9091}:9091"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [backend]
+
+  ms-ranking:
+    build:
+      context: ..
+      dockerfile: services/ms-ranking/Dockerfile
+    container_name: recruitment-ms-ranking
+    restart: unless-stopped
+    environment:
+      APP_NAME: ms-ranking
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${RANKING_APP_KEY:-base64:cmVjcnVpdG1lbnQtcmFua2luZy1rZXktZGV2LW9ubHk=}
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-local}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-local}
+      AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+      DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      DYNAMODB_RANKING_TABLE: ${DYNAMODB_RANKING_TABLE:-recruitment_rankings}
+      DYNAMODB_SAGA_TABLE: ${DYNAMODB_SAGA_TABLE:-recruitment_saga_states}
+      DYNAMODB_IDEMPOTENCY_TABLE: ${DYNAMODB_IDEMPOTENCY_TABLE:-recruitment_idempotency}
+      DYNAMODB_AUDIT_TABLE: ${DYNAMODB_AUDIT_TABLE:-recruitment_audit_log}
+      DYNAMODB_OUTBOX_TABLE: ${DYNAMODB_OUTBOX_TABLE:-recruitment_outbox_events}
+      IDEMPOTENCY_TTL_SECONDS: ${IDEMPOTENCY_TTL_SECONDS:-86400}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USER: ${RABBITMQ_USER:-platform_user}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-platform_dev}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-recruitment}
+      RABBITMQ_EXCHANGE: recruitment.events
+      RABBITMQ_SAGA_QUEUE: ranking.saga.events
+      AI_NODE_HTTP_URL: ${AI_NODE_HTTP_URL:-http://ai-node:8000}
+      VACANCY_GRPC_ADDRESS: ms-vacantes:9090
+      VACANCY_GRPC_TIMEOUT_SECONDS: ${VACANCY_GRPC_TIMEOUT_SECONDS:-5}
+    ports:
+      - "8084:8000"
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/ranking/health >/dev/null"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    networks: [backend]
+
+  ai-node:
+    build:
+      context: ..
+      dockerfile: services/ai-node/Dockerfile
+    container_name: recruitment-ai-node
+    restart: unless-stopped
+    environment:
+      PORT: 8000
+      GRPC_PORT: 50051
+      VACANCIES_MCP_URL: http://ms-vacantes:8080
+      INGESTION_MCP_URL: http://ms-ingesta:3000
+      RANKING_MCP_URL: http://ms-ranking:8000
+      MCP_BEARER_TOKEN: ${MCP_BEARER_TOKEN:-}
+    ports:
+      - "${AI_NODE_HTTP_PORT:-8001}:8000"
+      - "${AI_NODE_GRPC_PORT:-50051}:50051"
+    depends_on:
+      ms-vacantes:
+        condition: service_healthy
+      ms-ingesta:
+        condition: service_healthy
+      ms-ranking:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    networks: [backend]
+
+  cqrs-read-service:
+    build:
+      context: ..
+      dockerfile: services/cqrs-read-service/Dockerfile
+    container_name: recruitment-cqrs-read-service
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgresql+psycopg://${CQRS_DB_USER:-cqrs_read_user}:${CQRS_DB_PASSWORD:-cqrs_read_dev}@postgres:5432/${CQRS_DB:-recruitment_read_db}
+      REPORT_DATABASE_URL: postgresql+psycopg://${CQRS_READONLY_DB_USER:-cqrs_report_user}:${CQRS_READONLY_DB_PASSWORD:-cqrs_report_dev}@postgres:5432/${CQRS_DB:-recruitment_read_db}
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-platform_user}:${RABBITMQ_PASSWORD:-platform_dev}@rabbitmq:5672/${RABBITMQ_VHOST:-recruitment}
+      RABBITMQ_EXCHANGE: recruitment.events
+      RABBITMQ_QUEUE: cqrs.read-model
+    ports:
+      - "${CQRS_HTTP_PORT:-8083}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks: [backend]
+
+  mf-erp-react:
+    build:
+      context: ..
+      dockerfile: apps/mf-erp-react/Dockerfile
+    container_name: recruitment-mf-erp
+    restart: unless-stopped
+    networks: [backend]
+
+  mf-bi-angular:
+    build:
+      context: ..
+      dockerfile: apps/mf-bi-angular/Dockerfile
+    container_name: recruitment-mf-bi
+    restart: unless-stopped
+    networks: [backend]
+
+  mf-portal-vue:
+    build:
+      context: ..
+      dockerfile: apps/mf-portal-vue/Dockerfile
+    container_name: recruitment-mf-portal
+    restart: unless-stopped
+    networks: [backend]
+
+  n8n:
+    image: n8nio/n8n:1.64.3
+    container_name: recruitment-n8n
+    restart: unless-stopped
+    environment:
+      N8N_HOST: ${N8N_HOST:-localhost}
+      N8N_PORT: 5678
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
+      N8N_PATH: /automation/
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:8080/automation/}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY:-development-only-change-me}
+      N8N_SERVICE_TOKEN: ${N8N_SERVICE_TOKEN:-}
+      GENERIC_TIMEZONE: America/La_Paz
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n:/workflows:ro
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    depends_on:
+      ms-ingesta:
+        condition: service_healthy
+      ms-ranking:
+        condition: service_healthy
+      ai-node:
+        condition: service_healthy
+    networks: [backend]
+
+  api-gateway:
+    image: nginx:1.27-alpine
+    container_name: recruitment-api-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      ms-vacantes:
+        condition: service_healthy
+      ms-ingesta:
+        condition: service_healthy
+      ms-ranking:
+        condition: service_healthy
+      ai-node:
+        condition: service_healthy
+      cqrs-read-service:
+        condition: service_healthy
+      mf-erp-react:
+        condition: service_started
+      mf-bi-angular:
+        condition: service_started
+      mf-portal-vue:
+        condition: service_started
+      n8n:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks: [backend]
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  mongodb_config_data:
+  dynamodb_data:
+  rabbitmq_data:
+  n8n_data:
+
+networks:
+  backend:
+    name: recruitment-backend
+    driver: bridge

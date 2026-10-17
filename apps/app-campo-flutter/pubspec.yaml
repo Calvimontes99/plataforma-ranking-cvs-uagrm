@@ -1,0 +1,22 @@
+name: app_campo_flutter
+description: Captura offline-first de candidatos en ferias de empleo
+publish_to: none
+version: 1.0.0+1
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+dependencies:
+  flutter:
+    sdk: flutter
+  connectivity_plus: ^6.1.0
+  http: ^1.2.2
+  image_picker: ^1.1.2
+  path: ^1.9.0
+  sqflite: ^2.4.1
+  tflite_flutter: ^0.11.0
+  uuid: ^4.5.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true
