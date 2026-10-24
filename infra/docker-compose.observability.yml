@@ -1,0 +1,92 @@
+services:
+  postgres:
+    cpus: "0.50"
+    mem_limit: 768m
+
+  mongodb:
+    cpus: "0.50"
+    mem_limit: 512m
+
+  dynamodb-local:
+    cpus: "0.25"
+    mem_limit: 512m
+    environment:
+      JAVA_TOOL_OPTIONS: -XX:ActiveProcessorCount=1 -Xms64m -Xmx256m
+
+  rabbitmq:
+    cpus: "0.35"
+    mem_limit: 512m
+    volumes:
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+
+  keycloak:
+    cpus: "0.50"
+    mem_limit: 768m
+    environment:
+      JAVA_OPTS_APPEND: -Xms128m -Xmx512m -XX:ActiveProcessorCount=1
+
+  ms-vacantes:
+    cpus: "0.75"
+    mem_limit: 1g
+    environment:
+      JAVA_TOOL_OPTIONS: -XX:ActiveProcessorCount=2 -XX:MaxRAMPercentage=60 -XX:InitialRAMPercentage=25
+
+  ms-ingesta:
+    cpus: "0.35"
+    mem_limit: 384m
+
+  ms-ranking:
+    cpus: "0.35"
+    mem_limit: 384m
+
+  ai-node:
+    cpus: "0.50"
+    mem_limit: 768m
+
+  cqrs-read-service:
+    cpus: "0.35"
+    mem_limit: 512m
+
+  mf-erp-react:
+    cpus: "0.15"
+    mem_limit: 192m
+
+  mf-bi-angular:
+    cpus: "0.15"
+    mem_limit: 192m
+
+  mf-portal-vue:
+    cpus: "0.15"
+    mem_limit: 192m
+
+  n8n:
+    cpus: "0.35"
+    mem_limit: 512m
+
+  api-gateway:
+    cpus: "0.15"
+    mem_limit: 128m
+
+  prometheus:
+    volumes:
+      - ./prometheus/prometheus-light.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=36h
+      - --storage.tsdb.wal-compression
+      - --query.max-concurrency=2
+    cpus: "0.35"
+    mem_limit: 384m
+
+  grafana:
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DATABASE_WAL: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+    cpus: "0.35"
+    mem_limit: 384m

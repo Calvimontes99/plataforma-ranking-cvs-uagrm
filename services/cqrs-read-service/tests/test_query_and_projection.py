@@ -177,6 +177,9 @@ def test_http_voice_query_schema_and_exports(db_engine, monkeypatch):
     monkeypatch.setattr(main, "readonly_session", lambda: readonly_session(db_engine))
     monkeypatch.setattr(main, "RabbitEventConsumer", NoopConsumer)
     with TestClient(main.app) as client:
+        metrics = client.get("/metrics")
+        assert metrics.status_code == 200
+        assert "http_request_duration_seconds" in metrics.text
         assert client.get("/reports/schema").status_code == 200
         assert client.post("/reports/voice-query", json={"question": "SELECT * FROM candidates"}).status_code == 400
         assert client.post("/reports/voice-query", json={"sql": "select 1"}).status_code == 422

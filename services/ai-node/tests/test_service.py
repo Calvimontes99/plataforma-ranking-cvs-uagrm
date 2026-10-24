@@ -31,6 +31,11 @@ def test_health_exposes_docker_healthcheck_endpoint(client):
     assert response.json()["status"] == "SERVING"
     assert response.json()["modelVersion"] == "synthetic-hr-v1"
 
+def test_metrics_endpoint_exposes_prometheus_metrics(client):
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert "http_request_duration_seconds" in response.text
+
 
 def test_extraction_and_supervised_compatibility_api(client):
     extracted = client.post(

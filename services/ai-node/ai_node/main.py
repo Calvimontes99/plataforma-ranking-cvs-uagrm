@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from ai_node import __version__
 from ai_node.api import router
@@ -38,6 +39,9 @@ def create_app(start_grpc: bool = True) -> FastAPI:
 
     application = FastAPI(title="Recruitment AI Node", version=__version__, lifespan=lifespan)
     application.include_router(router)
+    instrumentator = Instrumentator()
+    instrumentator.instrument(application)
+    instrumentator.expose(application, endpoint="/metrics", include_in_schema=False)
     return application
 
 

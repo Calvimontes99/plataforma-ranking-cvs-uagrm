@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { IngestCvUseCase } from './application/use-cases/ingest-cv.use-case';
 import { SagaStep2BlockDossierUseCase } from './application/use-cases/saga-step2-block-dossier.use-case';
 import { SagaStep2CompensateDossierUseCase } from './application/use-cases/saga-step2-compensate-dossier.use-case';
@@ -45,6 +46,7 @@ const useCases = [
 @Module({
   imports: [
     MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/ingestion_db'),
+    PrometheusModule.register({ path: '/metrics' }),
     PersistenceModule,
   ],
   controllers: [IngestionController, McpController, HealthController, IngestionGrpcController],

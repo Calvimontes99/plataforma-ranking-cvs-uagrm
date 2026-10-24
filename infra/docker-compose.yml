@@ -2,6 +2,7 @@ name: recruitment-platform
 
 services:
   postgres:
+    profiles: ["observability", "demo", "full"]
     image: postgres:16-alpine
     container_name: recruitment-postgres
     restart: unless-stopped
@@ -27,13 +28,14 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 10s
     networks: [backend]
 
   mongodb:
+    profiles: ["observability", "demo", "full"]
     image: mongo:7-jammy
     container_name: recruitment-mongodb
     restart: unless-stopped
@@ -56,13 +58,14 @@ services:
       - mongodb_config_data:/data/configdb
     healthcheck:
       test: ["CMD-SHELL", "mongosh --quiet --eval \"try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongodb:27017'}]}).ok }\" --username \"$${MONGO_INITDB_ROOT_USERNAME}\" --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin"]
-      interval: 10s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 15s
     networks: [backend]
 
   dynamodb-local:
+    profiles: ["observability", "demo", "full"]
     image: amazon/dynamodb-local:2.6.1
     container_name: recruitment-dynamodb
     restart: unless-stopped
@@ -74,13 +77,14 @@ services:
       - dynamodb_data:/home/dynamodblocal/data
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS --max-time 3 -X POST -H 'Content-Type: application/x-amz-json-1.0' -H 'X-Amz-Target: DynamoDB_20120810.ListTables' -H 'X-Amz-Date: 20200101T000000Z' -H 'Authorization: AWS4-HMAC-SHA256 Credential=local/20200101/us-east-1/dynamodb/aws4_request, SignedHeaders=host;x-amz-date;x-amz-target, Signature=0000000000000000000000000000000000000000000000000000000000000000' -d '{}' http://127.0.0.1:8000/ >/dev/null"]
-      interval: 10s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 15s
     networks: [backend]
 
   rabbitmq:
+    profiles: ["observability", "demo", "full"]
     image: rabbitmq:3.13-management-alpine
     container_name: recruitment-rabbitmq
     restart: unless-stopped
@@ -95,13 +99,14 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 20s
     networks: [backend]
 
   keycloak:
+    profiles: ["observability", "demo", "full"]
     image: quay.io/keycloak/keycloak:26.0.7
     container_name: recruitment-keycloak
     restart: unless-stopped
@@ -126,13 +131,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "timeout 3 bash -ec 'exec 3<>/dev/tcp/127.0.0.1/9000'"]
-      interval: 15s
+      interval: 20s
       timeout: 5s
       retries: 15
       start_period: 40s
     networks: [backend]
 
   ms-vacantes:
+    profiles: ["observability", "demo", "full"]
     build:
       context: ..
       dockerfile: services/ms-vacantes/Dockerfile
@@ -162,13 +168,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/api/v1/vacancies/health"]
-      interval: 15s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 40s
     networks: [backend]
 
   ms-ingesta:
+    profiles: ["observability", "demo", "full"]
     build:
       context: ..
       dockerfile: services/ms-ingesta/Dockerfile
@@ -195,13 +202,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
-      interval: 15s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 30s
     networks: [backend]
 
   ms-ranking:
+    profiles: ["observability", "demo", "full"]
     build:
       context: ..
       dockerfile: services/ms-ranking/Dockerfile
@@ -243,13 +251,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8000/api/v1/ranking/health >/dev/null"]
-      interval: 15s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 60s
     networks: [backend]
 
   ai-node:
+    profiles: ["observability", "demo", "full"]
     build:
       context: ..
       dockerfile: services/ai-node/Dockerfile
@@ -274,13 +283,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
-      interval: 15s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 90s
     networks: [backend]
 
   cqrs-read-service:
+    profiles: ["observability", "demo", "full"]
     build:
       context: ..
       dockerfile: services/cqrs-read-service/Dockerfile
@@ -302,13 +312,14 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=3)"]
-      interval: 15s
+      interval: 20s
       timeout: 5s
       retries: 10
       start_period: 30s
     networks: [backend]
 
   mf-erp-react:
+    profiles: ["demo", "full"]
     build:
       context: ..
       dockerfile: apps/mf-erp-react/Dockerfile
@@ -317,6 +328,7 @@ services:
     networks: [backend]
 
   mf-bi-angular:
+    profiles: ["demo", "full"]
     build:
       context: ..
       dockerfile: apps/mf-bi-angular/Dockerfile
@@ -325,6 +337,7 @@ services:
     networks: [backend]
 
   mf-portal-vue:
+    profiles: ["demo", "full"]
     build:
       context: ..
       dockerfile: apps/mf-portal-vue/Dockerfile
@@ -333,6 +346,7 @@ services:
     networks: [backend]
 
   n8n:
+    profiles: ["demo", "full"]
     image: n8nio/n8n:1.64.3
     container_name: recruitment-n8n
     restart: unless-stopped
@@ -360,6 +374,7 @@ services:
     networks: [backend]
 
   api-gateway:
+    profiles: ["demo", "full"]
     image: nginx:1.27-alpine
     container_name: recruitment-api-gateway
     restart: unless-stopped
@@ -390,9 +405,52 @@ services:
         condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks: [backend]
+
+  prometheus:
+    profiles: ["observability", "full"]
+    image: prom/prometheus
+    container_name: recruitment-prometheus
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+    ports:
+      - "9092:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      ms-vacantes:
+        condition: service_healthy
+      ms-ingesta:
+        condition: service_healthy
+      ms-ranking:
+        condition: service_healthy
+      ai-node:
+        condition: service_healthy
+      cqrs-read-service:
+        condition: service_healthy
+    networks: [backend]
+
+  grafana:
+    profiles: ["observability", "full"]
+    image: grafana/grafana
+    container_name: recruitment-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_started
     networks: [backend]
 
 volumes:
@@ -402,6 +460,8 @@ volumes:
   dynamodb_data:
   rabbitmq_data:
   n8n_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   backend:

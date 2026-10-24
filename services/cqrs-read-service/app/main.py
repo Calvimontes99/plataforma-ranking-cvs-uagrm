@@ -6,6 +6,7 @@ from io import BytesIO
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, StreamingResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import ValidationError
 from sqlalchemy import text
 
@@ -39,6 +40,9 @@ app = FastAPI(
     description="Read-only reporting over a denormalized recruitment projection.",
     lifespan=lifespan,
 )
+instrumentator = Instrumentator()
+instrumentator.instrument(app)
+instrumentator.expose(app, endpoint="/metrics", include_in_schema=False)
 
 
 @app.exception_handler(UnsafeQueryError)

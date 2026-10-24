@@ -19,7 +19,13 @@ public class SecurityConfig {
         return http
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/graphql", "/api/**", "/mcp/**"))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/vacancies/health", "/error").permitAll()
+                        .requestMatchers(
+                                "/api/v1/vacancies/health",
+                                "/actuator/health",
+                                "/actuator/prometheus",
+                                "/actuator/prometheus/**",
+                                "/error")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtConverter())))
                 .build();
