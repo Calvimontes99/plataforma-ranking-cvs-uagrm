@@ -8,20 +8,17 @@ Abra PowerShell en la raíz del repositorio y ejecute:
 
 ```powershell
 Set-Location "C:\Users\calvi\OneDrive\Desktop\parcial2-sw2"
-docker compose -f .\infra\docker-compose.yml up -d --build
+$compose = @("-f", ".\infra\docker-compose.yml", "-f", ".\infra\docker-compose.observability.yml")
+docker compose @compose --profile demo up -d
 python .\infra\seed-demo-data.py
-docker compose -f .\infra\docker-compose.yml ps
+docker compose @compose --profile demo ps
 ```
 
 El seed es idempotente: puede ejecutarse nuevamente para devolver cupos, CVs, postulaciones y rankings a su estado inicial. Espere a que muestre `Demo lista` antes de abrir las pantallas.
 
-Si Keycloak ya había sido levantado antes de incorporar los usuarios demo, su volumen conserva el realm antiguo. Para una preparación limpia —esto elimina exclusivamente los volúmenes de este proyecto— ejecute antes del `up`:
+Si faltan imágenes locales, Compose puede construir servicios que tienen `build`; no lo inicie sin autorización. Los volúmenes existentes se conservan. No ejecute `down -v` ni elimine datos para reiniciar el realm.
 
-```powershell
-docker compose -f .\infra\docker-compose.yml down -v
-docker compose -f .\infra\docker-compose.yml up -d --build
-python .\infra\seed-demo-data.py
-```
+Para ver las instrucciones de los perfiles `observability`, `demo` y `full`, sus comandos para detener servicios sin borrar datos y la verificación de Prometheus/Grafana, consulte la sección **Perfiles para desarrollo local** de `README.md`.
 
 ## 2. URLs y credenciales
 
@@ -62,8 +59,9 @@ IDs estables útiles durante la explicación:
 ## 4. Diagnóstico rápido
 
 ```powershell
-docker compose -f .\infra\docker-compose.yml ps
-docker compose -f .\infra\docker-compose.yml logs --tail 100 api-gateway ms-vacantes ms-ingesta ms-ranking cqrs-read-service ai-node
+$compose = @("-f", ".\infra\docker-compose.yml", "-f", ".\infra\docker-compose.observability.yml")
+docker compose @compose --profile demo ps
+docker compose @compose --profile demo logs --tail 100 api-gateway ms-vacantes ms-ingesta ms-ranking cqrs-read-service ai-node
 ```
 
 Para volver a sembrar sin reconstruir imágenes:

@@ -68,8 +68,6 @@ services:
     mem_limit: 128m
 
   prometheus:
-    volumes:
-      - ./prometheus/prometheus-light.yml:/etc/prometheus/prometheus.yml:ro
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus

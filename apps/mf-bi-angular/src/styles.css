@@ -1,1 +1,29 @@
-:root{font-family:Inter,system-ui;color:#20243f;background:#f3f1ec}*{box-sizing:border-box}body{margin:0}main{max-width:1450px;margin:auto;padding:30px}header{display:flex;justify-content:space-between;align-items:start;margin-bottom:28px}header small,.panel>small{color:#7460d8;font-weight:900;letter-spacing:.16em}h1{font-family:Georgia;font-size:2.8rem;margin:.4rem 0}nav{display:flex;gap:13px;align-items:center}a{text-decoration:none;color:#25294b;font-weight:800}button{background:#272b55;color:white;border:0;border-radius:9px;padding:11px 15px;font-weight:750;cursor:pointer}.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}.metrics article,.panel{background:white;border:1px solid #dedbd3;padding:22px;border-radius:14px}.metrics article{display:flex;flex-direction:column}.metrics b{font-size:2rem;margin:.5rem 0}.metrics em{color:#27805d;font-style:normal}.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}.funnel{margin:13px 0}.funnel label{display:flex;justify-content:space-between}.funnel i{display:block;height:10px;background:#63d3ad;border-radius:10px;margin-top:5px}.clusters{height:190px;display:flex;align-items:center;justify-content:space-around}.clusters i{display:grid;place-items:center;border-radius:50%;background:#7460d833;color:white;font-style:normal;border:2px solid #7460d8}.ask{display:grid;grid-template-columns:auto 1fr auto;gap:10px}.ask textarea{min-height:70px;border:1px solid #cbc8c0;border-radius:8px;padding:12px}.mic{background:#b9475e}.guard{display:flex;gap:16px;align-items:center;background:#e9f6ef;color:#205e46;padding:12px;border-radius:9px;margin:13px 0}.guard button{margin-left:auto;background:#fff;color:#a52f45;border:1px solid #a52f45}.blocked{padding:12px;background:#fde5e8;color:#8f1f35}.export{display:flex;gap:9px;align-items:center}.export b{margin-right:auto}.table{overflow:auto;margin-top:12px}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:10px;border-bottom:1px solid #e8e6e0;white-space:nowrap}th{font-size:.72rem;text-transform:uppercase;color:#6f7180}@media(max-width:800px){.metrics,.grid{grid-template-columns:1fr}.ask{grid-template-columns:1fr}.guard,header{align-items:start;flex-direction:column}.guard button{margin-left:0}}
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #17243b;
+  background: #eef2f7;
+  font-synthesis: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 1450px; margin: auto; padding: 30px 30px 56px; }
+header { display: flex; justify-content: space-between; align-items: start; gap: 24px; margin-bottom: 30px; }
+header small, .panel > small { color: #1c7a69; font-weight: 850; letter-spacing: .16em; font-size: .72rem; }
+h1 { color: #102b52; font-size: clamp(2.4rem, 5vw, 3.4rem); letter-spacing: -.05em; margin: .4rem 0; }
+nav { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+a { text-decoration: none; color: #1c467d; font-weight: 800; } a:hover { color: #0e7c68; }
+button { background: #124e68; color: white; border: 0; border-radius: 10px; padding: 12px 16px; font: inherit; font-weight: 800; cursor: pointer; transition: .2s ease; }
+button:hover:not(:disabled) { background: #0d3d51; transform: translateY(-2px); } button:disabled { opacity: .45; cursor: not-allowed; }
+.metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.metrics article, .panel { background: white; border: 1px solid #d9e1eb; padding: 24px; border-radius: 16px; box-shadow: 0 10px 28px #17243b12; transition: .2s ease; }
+.metrics article:hover, .panel:hover { box-shadow: 0 16px 34px #17243b1c; transform: translateY(-2px); }
+.metrics article { display: flex; flex-direction: column; gap: 6px; color: #617189; }.metrics b { color: #102b52; font-size: 2.25rem; margin: .4rem 0; }.metrics em { color: #178063; font-style: normal; font-weight: 750; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin: 18px 0; }
+.funnel { margin: 16px 0; }.funnel label { display: flex; justify-content: space-between; color: #455970; }.funnel i { display: block; height: 10px; background: linear-gradient(90deg, #1b8c76, #7bcbb6); border-radius: 10px; margin-top: 7px; }
+.clusters { height: 190px; display: flex; align-items: center; justify-content: space-around; }.clusters i { display: grid; place-items: center; border-radius: 50%; background: #174d7328; color: #174d73; font-style: normal; border: 2px solid #287b9d; font-weight: 800; }.panel p { color: #617189; line-height: 1.6; }
+.ask { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; }.ask textarea { min-height: 70px; border: 1px solid #cbd6e3; border-radius: 10px; padding: 13px; font: inherit; line-height: 1.5; outline: none; }.ask textarea:focus { border-color: #1b7d6a; box-shadow: 0 0 0 3px #1b7d6a1c; }
+.mic { background: #e0792f; }.mic:hover:not(:disabled) { background: #c96320; }
+.guard { display: flex; gap: 16px; align-items: center; background: #e3f5ef; color: #205e46; padding: 14px; border-radius: 10px; margin: 16px 0; }.guard button { margin-left: auto; background: white; color: #a53d36; border: 1px solid #c96a5e; box-shadow: none; }
+.blocked { padding: 14px; background: #fde7e4; color: #8f3028; border-radius: 10px; }.error { color: #a53d36; }.export { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }.export b { margin-right: auto; color: #455970; }
+.table { overflow: auto; margin-top: 16px; border: 1px solid #d9e1eb; border-radius: 12px; } table { border-collapse: collapse; width: 100%; } th, td { text-align: left; padding: 14px 16px; border-bottom: 1px solid #e6ecf2; white-space: nowrap; } th { background: #102b52; color: #edf5fb; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; } tbody tr:nth-child(even) { background: #f6f9fb; } tbody tr:hover { background: #e5f3ef; }
+@media (max-width: 800px) { .metrics, .grid { grid-template-columns: 1fr; }.ask { grid-template-columns: 1fr; }.guard, header { align-items: start; flex-direction: column; }.guard button { margin-left: 0; }.export b { width: 100%; } }
