@@ -25,7 +25,35 @@
       "directAccessGrantsEnabled": false,
       "redirectUris": ["http://localhost:3000/*", "http://localhost:8080/*"],
       "webOrigins": ["http://localhost:3000", "http://localhost:8080"],
-      "defaultClientScopes": ["vacancies:read", "vacancies:write", "mcp:execute"]
+      "defaultClientScopes": ["vacancies:read", "vacancies:write", "mcp:execute"],
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "username",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "username",
+            "claim.name": "preferred_username",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     },
     {
       "clientId": "recruitment-frontends",
@@ -47,7 +75,7 @@
       "enabled": true,
       "emailVerified": true,
       "credentials": [{ "type": "password", "value": "Demo123!", "temporary": false }],
-      "realmRoles": ["RRHH", "AI_AGENT"]
+      "realmRoles": ["RRHH"]
     },
     {
       "username": "docente.demo",
@@ -57,7 +85,7 @@
       "enabled": true,
       "emailVerified": true,
       "credentials": [{ "type": "password", "value": "Demo123!", "temporary": false }],
-      "realmRoles": ["RRHH"]
+      "realmRoles": ["AI_AGENT"]
     }
   ]
 }

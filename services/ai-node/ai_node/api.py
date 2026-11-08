@@ -159,6 +159,7 @@ async def analyze_video(body: VideoAnalysisBody, request: Request) -> dict[str, 
 @router.post("/agents/execute-mission")
 async def execute_mission(body: dict[str, Any], request: Request) -> dict[str, Any]:
     try:
-        return await request.app.state.orchestrator.execute(body)
+        auth_header = request.headers.get("authorization")
+        return await request.app.state.orchestrator.execute(body, authorization=auth_header)
     except MissionGuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

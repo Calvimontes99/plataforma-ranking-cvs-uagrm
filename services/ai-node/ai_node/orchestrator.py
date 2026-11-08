@@ -162,7 +162,7 @@ class McpMissionOrchestrator:
         if self.owns_client:
             await self.client.aclose()
 
-    async def execute(self, raw_mission: dict[str, Any]) -> dict[str, Any]:
+    async def execute(self, raw_mission: dict[str, Any], authorization: str | None = None) -> dict[str, Any]:
         request = validate_mission(raw_mission)
         correlation_id = request["context"].get("correlationId") or request["context"].get("correlation_id") or "ai-mission"
         headers = {
@@ -171,7 +171,9 @@ class McpMissionOrchestrator:
             "X-AI-Guardrail": "read-only-mcp-tools-v1",
         }
         bearer_token = os.getenv("MCP_BEARER_TOKEN", "").strip()
-        if bearer_token:
+        if authorization and authorization.strip():
+            headers["Authorization"] = authorization.strip()
+        elif bearer_token:
             headers["Authorization"] = f"Bearer {bearer_token}"
         steps: list[dict[str, Any]] = []
         vacancy_id = request["vacancyId"]
@@ -350,7 +352,7 @@ class McpMissionOrchestrator:
             response = await self.client.post(
                 base_url.rstrip("/") + "/mcp/execute",
                 json={"name": tool_name, "arguments": arguments},
-                headers=headers,
+                headers={**headers, "Idempotency-Key": str(uuid.uuid4())},
             )
             response.raise_for_status()
             payload = response.json()
