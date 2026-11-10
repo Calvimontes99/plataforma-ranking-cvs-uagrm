@@ -45,6 +45,11 @@ instrumentator.instrument(app)
 instrumentator.expose(app, endpoint="/metrics", include_in_schema=False)
 
 
+@app.get("/", include_in_schema=False)
+def root():
+    return {"service": "cqrs-read-service", "status": "running"}
+
+
 @app.exception_handler(UnsafeQueryError)
 async def unsafe_query_handler(_: Request, exc: UnsafeQueryError):
     return JSONResponse(status_code=400, content={"detail": str(exc)})

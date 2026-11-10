@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -5,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import '../models/candidate_capture.dart';
 import '../services/cv_inference_service.dart';
 import '../services/local_database.dart';
+import '../services/push_notification_service.dart';
 import '../services/sync_manager.dart';
 
 class CaptureScreen extends StatefulWidget {
@@ -20,16 +25,23 @@ class _CaptureScreenState extends State<CaptureScreen> {
   final inference = CvInferenceService();
   late final IngestionApiClient apiClient;
   late final SyncManager sync;
+  late final Connectivity connectivity;
+  StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
 
   String? image;
+  PlatformFile? selectedDocument;
   double cvScore = 0;
   double interview = 50;
   String status = 'Listo para trabajar sin conexión';
+  String? fcmToken;
+  bool syncing = false;
 
   @override
   void initState() {
     super.initState();
+    _loadFcmToken();
     inference.initialize();
+    connectivity = Connectivity();
     apiClient = IngestionApiClient(
       baseUrl: const String.fromEnvironment(
         'GATEWAY_URL',
@@ -39,7 +51,28 @@ class _CaptureScreenState extends State<CaptureScreen> {
     sync = SyncManager(
       apiClient: apiClient,
       database: LocalDatabase.instance,
+      connectivity: connectivity,
     );
+    connectivitySubscription =
+        connectivity.onConnectivityChanged.listen((results) {
+      if (!results.contains(ConnectivityResult.none)) unawaited(synchronize());
+    });
+  }
+
+  Future<void> _loadFcmToken() async {
+    try {
+      final push = PushNotificationService.instance;
+      final token = await push.getToken();
+      if (mounted) setState(() => fcmToken = token);
+      // TODO(auth/backend): register this token after recruiter login, e.g.
+      // POST /api/devices with {token, platform, userId}. Never log it in prod.
+      push.onTokenRefresh.listen((newToken) {
+        if (mounted) setState(() => fcmToken = newToken);
+        // Forward refreshed token to the authenticated backend here too.
+      });
+    } catch (error) {
+      debugPrint('FCM token unavailable: $error');
+    }
   }
 
   Future<void> capture() async {
@@ -57,35 +90,106 @@ class _CaptureScreenState extends State<CaptureScreen> {
     });
   }
 
+  Future<void> chooseDocument() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const ['pdf', 'docx'],
+        allowMultiple: false,
+        withData: false,
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+      if (file.path == null) {
+        setState(() =>
+            status = 'No se pudo acceder a la ruta del archivo seleccionado.');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        setState(() => status = 'El archivo supera el limite de 10 MB.');
+        return;
+      }
+
+      setState(() {
+        selectedDocument = file;
+        status = 'Archivo listo para guardar: ${file.name}';
+      });
+    } catch (error) {
+      setState(() => status = 'No se pudo seleccionar el archivo: $error');
+    }
+  }
+
   Future<void> save() async {
-    if (image == null || name.text.trim().isEmpty) return;
+    if ((image == null && selectedDocument == null) ||
+        name.text.trim().isEmpty) {
+      setState(() =>
+          status = 'Indica el nombre y adjunta un CV o toma una fotografia.');
+      return;
+    }
 
     final uuid = const Uuid();
-    await LocalDatabase.instance.save(
-      CandidateCapture(
-        id: uuid.v4(),
-        idempotencyKey: uuid.v4(),
-        name: name.text.trim(),
-        vacancyId: vacancy.text.trim(),
-        imagePath: image!,
-        interviewScore: interview,
-        localCvScore: cvScore,
-        createdAt: DateTime.now(),
-      ),
-    );
+    final document = selectedDocument;
+    final extension = (document?.extension ?? '').toLowerCase();
+    final contentType = switch (extension) {
+      'pdf' => 'application/pdf',
+      'docx' =>
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      _ => null,
+    };
+    try {
+      await LocalDatabase.instance.save(
+        CandidateCapture(
+          id: uuid.v4(),
+          idempotencyKey: uuid.v4(),
+          name: name.text.trim(),
+          vacancyId: vacancy.text.trim(),
+          imagePath: image ?? '',
+          attachmentPath: document?.path,
+          attachmentName: document?.name,
+          attachmentContentType: contentType,
+          interviewScore: interview,
+          localCvScore: cvScore,
+          createdAt: DateTime.now(),
+        ),
+      );
+    } catch (error) {
+      setState(
+          () => status = 'No se pudo guardar el archivo localmente: $error');
+      return;
+    }
+    setState(() {
+      image = null;
+      selectedDocument = null;
+    });
+    final connectivityResults = await connectivity.checkConnectivity();
+    if (!connectivityResults.contains(ConnectivityResult.none)) {
+      unawaited(Future<void>.delayed(const Duration(milliseconds: 300))
+          .then((_) => synchronize()));
+    }
     setState(() {
       status = 'Guardado en SQLite. Se sincronizará al recuperar conexión.';
     });
   }
 
   Future<void> synchronize() async {
-    final result = await sync.syncPending();
-    setState(() {
-      status = result.failures.isEmpty
-          ? '${result.synchronized} registros sincronizados sin duplicados'
-          : '${result.synchronized} sincronizados; '
-              '${result.failures.length} quedan pendientes';
-    });
+    if (syncing) return;
+    syncing = true;
+    try {
+      final result = await sync.syncPending();
+      if (mounted) {
+        setState(() {
+          status = result.failures.isEmpty
+              ? '${result.synchronized} registros sincronizados sin duplicados'
+              : '${result.synchronized} sincronizados; '
+                  '${result.failures.length} quedan pendientes';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => status = 'No se pudo sincronizar: $error');
+    } finally {
+      syncing = false;
+    }
   }
 
   @override
@@ -127,6 +231,26 @@ class _CaptureScreenState extends State<CaptureScreen> {
             icon: const Icon(Icons.camera_alt),
             label: const Text('Fotografiar CV impreso'),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: chooseDocument,
+            icon: const Icon(Icons.attach_file),
+            label: const Text('Seleccionar CV PDF o Word'),
+          ),
+          if (selectedDocument != null)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.description_outlined),
+              title: Text(selectedDocument!.name,
+                  maxLines: 1, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                  '${(selectedDocument!.size / (1024 * 1024)).toStringAsFixed(2)} MB'),
+              trailing: IconButton(
+                tooltip: 'Quitar archivo',
+                onPressed: () => setState(() => selectedDocument = null),
+                icon: const Icon(Icons.close),
+              ),
+            ),
           if (image != null)
             Padding(
               padding: const EdgeInsets.all(12),
@@ -150,7 +274,16 @@ class _CaptureScreenState extends State<CaptureScreen> {
           Card(
             child: Padding(
               padding: const EdgeInsets.all(14),
-              child: Text(status),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(status),
+                  if (fcmToken != null) ...[
+                    const SizedBox(height: 8),
+                    const Text('Notificaciones push activas'),
+                  ],
+                ],
+              ),
             ),
           ),
         ],
@@ -160,6 +293,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
 
   @override
   void dispose() {
+    if (connectivitySubscription != null) {
+      unawaited(connectivitySubscription!.cancel());
+    }
     name.dispose();
     vacancy.dispose();
     inference.dispose();

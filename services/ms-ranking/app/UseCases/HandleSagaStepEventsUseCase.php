@@ -43,7 +43,12 @@ final class HandleSagaStepEventsUseCase
             $this->completeStep2AndCreateContract($saga);
             return;
         }
-        if (in_array($eventType, ['VacancyAdjudicationFailedEvent', 'saga.step2.dossier-lock-failed', 'DossierLockFailedEvent'], true)) {
+        if (in_array($eventType, [
+            'VacancyAdjudicationFailedEvent',
+            'saga.vacancy.adjudication.failed',
+            'saga.step2.dossier-lock-failed',
+            'DossierLockFailedEvent',
+        ], true)) {
             $this->compensate($sagaId, (string) ($payload['reason'] ?? 'SAGA participant failed'));
             return;
         }

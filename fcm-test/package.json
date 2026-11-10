@@ -1,0 +1,12 @@
+{
+  "name": "uagrm-fcm-test",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "send": "node send-test.js"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}

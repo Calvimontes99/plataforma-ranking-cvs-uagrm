@@ -10,7 +10,7 @@ Plataforma empresarial distribuida para recibir currículums, evaluar compatibil
 - extracción y clasificación asistida por IA.
 - ranking de candidatos por habilidades y compatibilidad.
 - gestión de vacantes, cupos, preaprobaciones y contratos.
-- adjudicación distribuida mediante SAGA con rollback en MongoDB y DynamoDB.
+- adjudicación distribuida mediante SAGA con eventos de compensación entre los servicios participantes.
 - consultas GraphQL selectivas para reducir over-fetching.
 - Read Model CQRS optimizado para dashboards, voz y exportaciones XLSX/PDF.
 - herramientas MCP para misiones ejecutadas por agentes de IA.
@@ -64,6 +64,108 @@ flowchart LR
 | `n8n`               | n8n                     | ingesta, ranking, preaprobación y notificaciones          |
 
 Los contratos compartidos se encuentran en [`proto/recruitment.proto`](proto/recruitment.proto). La especificación funcional y arquitectónica está disponible en [`SPEC.md`](SPEC.md).
+
+## Flujos técnicos implementados
+
+Esta sección describe el comportamiento que se encuentra en el código del repositorio. Los servicios requieren configuración local (variables de entorno, credenciales externas y activación de workflows) para operar fuera del entorno de demostración.
+
+### Entrada, servicios y persistencia
+
+Nginx es la entrada HTTP del stack y se publica en el puerto `8080`. Enruta las interfaces web bajo `/erp/`, `/bi/` y `/portal/`; Keycloak bajo `/auth/`; n8n bajo `/automation/`; y las API versionadas de vacantes, ingesta, ranking, IA y lectura bajo `/api/v1/`. También expone `/health`. Los servicios publican contratos HTTP y, donde está configurado, gRPC; los eventos de dominio circulan por RabbitMQ.
+
+| Servicio | Responsabilidad | Persistencia principal |
+| --- | --- | --- |
+| `ms-vacantes` (Spring Boot) | Vacantes, disponibilidad de cupos, preaprobaciones, contratos y participante final de adjudicación. Expone REST, GraphQL y gRPC. | PostgreSQL |
+| `ms-ingesta` (NestJS) | Recepción de postulaciones y CV por JSON o multipart, idempotencia, expediente y comandos/eventos de la SAGA. | MongoDB |
+| `ms-ranking` (Laravel) | Evaluación/ranking, estado coordinador de la SAGA, auditoría y eventos de salida. | DynamoDB (DynamoDB Local en desarrollo) |
+| `ai-node` (FastAPI) | Extracción y análisis asistido, embeddings, compatibilidad, agrupación y ejecución de misiones de agentes. | Servicio de inferencia; consulta a otros servicios según el flujo |
+| `cqrs-read-service` (FastAPI) | Proyección de lectura consumida desde RabbitMQ, consultas de reportes y exportaciones PDF/XLSX. | PostgreSQL, con credenciales de solo lectura para reportes |
+
+Las aplicaciones cliente son `mf-erp-react` (operaciones de RR. HH.), `mf-bi-angular` (indicadores y reportes), `mf-portal-vue` (portal de postulantes) y `app-campo-flutter` (captura móvil). El gateway y las rutas concretas están definidos en [`infra/nginx/nginx.conf`](infra/nginx/nginx.conf); el despliegue local y sus dependencias, en [`infra/docker-compose.yml`](infra/docker-compose.yml).
+
+### Adjudicación distribuida: SAGA y compensación
+
+El flujo coordinado por `ms-ranking` es una transacción distribuida basada en eventos y Outbox; no es una transacción ACID compartida entre las tres bases de datos. En términos funcionales:
+
+1. `ms-ranking` selecciona al candidato para la SAGA y persiste el nuevo estado, auditoría y comando de bloqueo en el Outbox de DynamoDB.
+2. El comando llega a `ms-ingesta` por RabbitMQ. El servicio bloquea el expediente y registra el resultado mediante su Outbox en MongoDB.
+3. Con el expediente bloqueado, `ms-ranking` invoca el paso de adjudicación de `ms-vacantes`. En una transacción PostgreSQL, el servicio verifica el cupo, registra el contrato y agrega el evento de resultado al Outbox.
+4. Al agotarse los cupos, `ms-vacantes` registra `VacancyAdjudicationFailedEvent` en el Outbox y lanza `CupoAgotadoException`. La excepción no revierte la transacción que guarda el evento de fallo (`noRollbackFor`), para que el publicador pueda notificar al coordinador.
+5. Ante el fallo, `ms-ranking` marca la SAGA en compensación, emite el comando de desbloqueo/restauración a `ms-ingesta` y revierte la selección del ranking. Los eventos de éxito llevan la SAGA a completada.
+
+Los publicadores de Outbox entregan estos mensajes a RabbitMQ de forma asíncrona. Esto evita mantener una transacción de base de datos abierta durante llamadas de red; la convergencia y la compensación se realizan por eventos. Las implementaciones están en `services/ms-ranking/app/UseCases`, `services/ms-ingesta/src/application/use-cases` y `services/ms-vacantes/src/main/java/com/recruitment/vacancies/application/usecase`.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant HR as ERP / RR. HH.
+    participant R as ms-ranking
+    participant D as DynamoDB + Outbox
+    participant Q as RabbitMQ
+    participant I as ms-ingesta
+    participant M as MongoDB + Outbox
+    participant V as ms-vacantes
+    participant P as PostgreSQL + Outbox
+    HR->>R: Seleccionar candidato
+    R->>D: Guardar estado y comando de bloqueo
+    D-->>Q: Publicar comando
+    Q-->>I: Bloquear expediente
+    I->>M: Guardar bloqueo y evento
+    M-->>Q: Expediente bloqueado
+    Q-->>R: Confirmar bloqueo
+    R->>V: Adjudicar vacante
+    V->>P: Verificar cupo y guardar contrato
+    alt Hay cupo
+        P-->>Q: VacancyAdjudicatedEvent
+        Q-->>R: Completar SAGA
+    else Cupo agotado
+        P-->>Q: VacancyAdjudicationFailedEvent
+        Q-->>R: Iniciar compensación
+        R-->>Q: Desbloquear expediente y restaurar ranking
+        Q-->>I: Ejecutar compensación
+    end
+```
+
+### App Flutter: captura y sincronización offline-first
+
+La app móvil mantiene una cola local en SQLite (`captures`). Cada postulación tiene un UUIDv4 persistido como clave de idempotencia, para reutilizarlo en los reintentos. La base de datos está versionada; el esquema actual almacena además ruta, nombre y tipo MIME del adjunto.
+
+El usuario puede elegir un PDF o DOCX con `file_picker`. Antes de guardar la postulación, la app copia el archivo seleccionado al directorio privado de la aplicación; la ruta de esa copia queda guardada en SQLite, de modo que el archivo siga disponible aunque el proveedor de archivos retire su copia temporal. Al sincronizar, el `SyncManager` procesa la cola por lotes (hasta 50 elementos por llamada) y envía las capturas con documento como `multipart/form-data` a `POST /api/v1/ingestion/cvs/upload`. Incluye el archivo en `file`, los campos de postulación y las cabeceras `Idempotency-Key` y `X-Idempotency-Key` con el mismo UUIDv4. Las capturas sin adjunto usan `POST /api/v1/ingestion/cvs` con JSON.
+
+La pantalla intenta sincronizar al detectar conexión y permite sincronización manual. Un registro y su copia local solo se eliminan cuando el servidor responde HTTP `200` o `201`; errores HTTP o de red conservan la cola para reintentar. `ms-ingesta` valida el tipo de archivo (PDF, DOCX o imágenes permitidas) y limita la carga a 10 MiB. La URL del gateway se configura con `GATEWAY_URL`; en un teléfono físico, el equipo debe poder alcanzar la dirección IP del host o se puede usar `adb reverse` durante desarrollo. Véase [`apps/app-campo-flutter/README.md`](apps/app-campo-flutter/README.md).
+
+```mermaid
+flowchart LR
+    CAP[Captura del postulante] --> DB[(SQLite local)]
+    FILE[PDF o DOCX] --> COPY[Copia privada de la app]
+    COPY --> DB
+    NET{¿Hay conexión?} -->|No| DB
+    NET -->|Sí| SYNC[SyncManager procesa cola]
+    DB --> SYNC
+    SYNC -->|Multipart + UUIDv4 Idempotency-Key| GW[Nginx :8080]
+    GW --> ING[ms-ingesta]
+    ING -->|200 / 201| DONE[Marcar sincronizado y limpiar archivo local]
+    ING -->|Error / timeout| RETRY[Conservar captura para reintento]
+    RETRY --> DB
+```
+
+### Notificaciones push: Firebase Cloud Messaging
+
+`app-campo-flutter` inicializa Firebase al arrancar, registra un handler de fondo y solicita permisos de notificación en Android (incluido el permiso en tiempo de ejecución de Android 13 y posteriores). `PushNotificationService` obtiene el token de la instalación, maneja su renovación, muestra mensajes en primer plano mediante `flutter_local_notifications` y procesa la apertura desde notificaciones. En segundo plano, Android presenta los mensajes FCM con payload `notification`; los mensajes solo de datos se muestran mediante notificación local en el handler.
+
+Para probar en un Honor, la app debe tener la configuración Firebase correspondiente al `applicationId` Android, el usuario debe conceder el permiso y el dispositivo debe tener Google Play Services disponibles para FCM. En Android 13+, el permiso de notificaciones debe quedar habilitado. En MagicOS, también conviene permitir inicio/actividad en segundo plano y excluir la app de restricciones agresivas de batería si las alertas se retrasan cuando el teléfono está bloqueado; los nombres de estos controles dependen de la versión del sistema. El token identifica una instalación y debe asociarse de forma autenticada a la cuenta reclutadora en el backend. **En el estado actual, la app obtiene y muestra/expone el token, pero no existe aún un endpoint del monorepo que lo registre automáticamente ni un flujo de producción que envíe notificaciones de sincronización o vacantes prioritarias.** `fcm-test` es una utilidad de envío manual con Firebase Admin SDK (FCM HTTP v1); requiere credenciales de servicio y un token de dispositivo locales. Nunca se deben guardar esas credenciales en Git.
+
+### Ingesta omnicanal con n8n
+
+El workflow [`infra/n8n/workflow-reclutamiento-whatsapp.json`](infra/n8n/workflow-reclutamiento-whatsapp.json) define un webhook `POST /automation/webhook/whatsapp-cv`. Recibe datos de postulante y CV, envía la postulación a `ms-ingesta`, solicita evaluación a `ms-ranking`, aplica una condición de puntuación (`score >= 85`) y, si cumple el umbral, solicita la preaprobación en `ms-vacantes` y envía invitaciones por SMTP y WhatsApp. La ingesta lleva una clave idempotente basada en el identificador del mensaje cuando está disponible.
+
+El archivo es una plantilla importable, pero actualmente figura con `active: false` y credenciales SMTP incompletas. Para ejecutar el flujo se debe importar y activar en n8n, configurar `N8N_SERVICE_TOKEN`, `WHATSAPP_TOKEN`, la URL del proveedor y las credenciales SMTP. Por ello, la descripción del flujo representa la automatización definida en el repositorio; el webhook no queda operativo solo por levantar Docker Compose.
+
+### Límites actuales de la integración
+
+- El flujo FCM y el workflow de n8n están implementados por separado: n8n aún no envía alertas push a reclutadores.
+- La utilidad `firebase-admin` sirve para pruebas manuales; no sustituye una integración de notificaciones en backend ni el registro autenticado de tokens.
+- La disponibilidad real de cada flujo depende de los servicios externos y credenciales configurados en el entorno.
 
 ## Contenedores y puertos
 
@@ -197,7 +299,48 @@ docker compose @compose --profile demo ps
 python infra/seed-demo-data.py
 ```
 
-El seed es idempotente y crea tres vacantes y ocho candidatos en PostgreSQL, MongoDB, DynamoDB Local y el Read Model CQRS. Puede repetirse para restaurar el escenario inicial.
+El seed es idempotente y crea tres vacantes y ocho candidatos en PostgreSQL, MongoDB, DynamoDB Local y el Read Model CQRS. Puede repetirse para restaurar el escenario de demostración; son datos sintéticos, no una copia de las bases activas.
+
+Para agregar un lote mayor sin borrar ni reiniciar datos existentes, levanta el perfil `demo` y ejecuta:
+
+```powershell
+python infra/seed-bulk-candidates.py
+```
+
+El seeder agrega 72 perfiles ficticios deterministas (80 en total junto con los ocho base), con 18 postulaciones por estado: evaluadas, preaprobadas, seleccionadas y rechazadas. Usa IDs relacionados para candidato, CV, postulación, vacante y ranking en MongoDB, PostgreSQL, DynamoDB Local y el Read Model; es idempotente y requiere que existan las tres vacantes del escenario base. Los datos sintéticos incluyen perfiles/educación/habilidades variados, canales y marcas temporales. Las preaprobaciones se registran en PostgreSQL para que aparezcan en el ERP; el Read Model se siembra directamente para que los reportes BI tengan filas disponibles. No se generan archivos CV reales.
+
+### Respaldo y restauración de datos
+
+Con el perfil `demo` en ejecución, exporta PostgreSQL (vacantes y Read Model CQRS), MongoDB (ingesta) y las cinco tablas DynamoDB Local desde la raíz del repositorio:
+
+```powershell
+.\infra\backup-db.ps1
+```
+
+Los archivos quedan en `infra/postgres/backups/` (`vacancies.dump`, `read-model.dump`), `infra/mongodb/backups/` (`ingestion.archive.gz`) y `infra/dynamodb/backups/` (`dynamodb.json`). El script utiliza `pg_dump`, `mongodump` y el SDK de DynamoDB que ya está instalado en `ms-ranking`. Los respaldos se excluyen de Git porque pueden incluir datos personales; transfiérelos al compañero por un canal privado. Después de clonar, desde la raíz del repositorio, debe copiarlos a sus rutas:
+
+```powershell
+$backupDir = "C:\ruta\privada\al\respaldo"
+Copy-Item "$backupDir\vacancies.dump" .\infra\postgres\backups\
+Copy-Item "$backupDir\read-model.dump" .\infra\postgres\backups\
+Copy-Item "$backupDir\ingestion.archive.gz" .\infra\mongodb\backups\
+Copy-Item "$backupDir\dynamodb.json" .\infra\dynamodb\backups\
+```
+
+En una instalación nueva, inicia el perfil `demo`:
+
+```powershell
+$compose = @("-f", ".\infra\docker-compose.yml", "--profile", "demo")
+docker compose @compose up -d
+```
+
+Si `postgres_data` está vacío, los scripts de inicialización crean las bases y restauran automáticamente `vacancies.dump` y `read-model.dump` cuando esos archivos existen. La restauración de PostgreSQL se ejecuta solo durante la primera inicialización del volumen. Cuando los servicios estén saludables, ejecuta el restaurador:
+
+```powershell
+.\infra\restore-db.ps1
+```
+
+Este comando restaura MongoDB y DynamoDB Local; las tablas DynamoDB se crean al iniciar `ms-ranking`. Ejecútalo una vez sobre volúmenes nuevos para reproducir el snapshot sin combinarlo con datos previos. Los volcados no incluyen la base interna de Keycloak (el realm se importa desde `infra/keycloak/realm-recruitment.json`) ni el SQLite privado que reside en cada instalación móvil. Para recrear el conjunto sintético de demostración en los almacenes, ejecuta `python infra/seed-demo-data.py` después de que el stack esté saludable.
 
 Credenciales del realm `recruitment`:
 

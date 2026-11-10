@@ -30,6 +30,11 @@ public class VacancyGraphqlController {
             "000000000003", new BigDecimal("9000"), "000000000004", new BigDecimal("12000"),
             "000000000005", new BigDecimal("11000"), "000000000006", new BigDecimal("10800"),
             "000000000007", new BigDecimal("8000"), "000000000008", new BigDecimal("6000"));
+    private static final List<String> BULK_FIRST_NAMES = List.of(
+            "Sofía", "Mateo", "Valentina", "Sebastián", "Lucía", "Nicolás",
+            "Camila", "Gabriel", "Daniela", "Alejandro", "Mariana", "Diego");
+    private static final List<String> BULK_LAST_NAMES = List.of(
+            "Rivera", "Mendoza", "Vargas", "Rojas", "Salazar", "Flores");
     public record VacancyView(UUID id, UUID departamentoId, String titulo, String descripcion,
                               int cupoTotal, int cupoDisponible, BigDecimal salarioPresupuestado,
                               String moneda, EstadoVacante estado, List<String> habilidadesRequeridas,
@@ -80,7 +85,19 @@ public class VacancyGraphqlController {
     @SchemaMapping(typeName = "PreAprobacion", field = "nombreCompleto")
     public String nombreCompleto(PreAprobacion item) {
         String suffix = item.candidatoId().toString().substring(24);
-        return DEMO_NAMES.getOrDefault(suffix, "Candidato " + item.candidatoId().toString().substring(0, 8));
+        String knownName = DEMO_NAMES.get(suffix);
+        if (knownName != null) return knownName;
+        try {
+            long number = Long.parseLong(suffix);
+            if (number >= 9 && number <= 80) {
+                int offset = (int) number - 9;
+                return BULK_FIRST_NAMES.get(offset % BULK_FIRST_NAMES.size()) + " "
+                        + BULK_LAST_NAMES.get((offset / BULK_FIRST_NAMES.size()) % BULK_LAST_NAMES.size());
+            }
+        } catch (NumberFormatException ignored) {
+            // Non-demo candidate IDs use the generic fallback below.
+        }
+        return "Candidato " + item.candidatoId().toString().substring(0, 8);
     }
 
     @SchemaMapping(typeName = "PreAprobacion", field = "puntajeRanking")
@@ -88,7 +105,16 @@ public class VacancyGraphqlController {
 
     @SchemaMapping(typeName = "PreAprobacion", field = "pretensionSalarial")
     public BigDecimal pretensionSalarial(PreAprobacion item) {
-        return DEMO_SALARIES.get(item.candidatoId().toString().substring(24));
+        String suffix = item.candidatoId().toString().substring(24);
+        BigDecimal knownSalary = DEMO_SALARIES.get(suffix);
+        if (knownSalary != null) return knownSalary;
+        try {
+            long number = Long.parseLong(suffix);
+            if (number >= 9 && number <= 80) return BigDecimal.valueOf(6000 + ((number * 137) % 9000));
+        } catch (NumberFormatException ignored) {
+            // No salary snapshot exists for non-demo candidates.
+        }
+        return null;
     }
 
     @MutationMapping @PreAuthorize("hasAnyAuthority('SCOPE_vacancies:write','ROLE_RRHH')")

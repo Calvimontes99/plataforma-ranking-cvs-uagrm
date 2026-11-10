@@ -1,4 +1,4 @@
-import { IsIn, IsObject, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
+import { IsDateString, IsIn, IsNumberString, IsObject, IsOptional, IsString, IsUUID, MaxLength } from 'class-validator';
 
 export class IngestCvDto {
   @IsOptional()
@@ -21,4 +21,21 @@ export class IngestCvDto {
   @IsOptional()
   @IsObject()
   applicant?: Record<string, unknown>;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  applicantName?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  localCvScore?: string;
+
+  @IsOptional()
+  @IsNumberString()
+  interviewScore?: string;
+
+  @IsOptional()
+  @IsDateString()
+  capturedAt?: string;
 }

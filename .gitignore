@@ -5,6 +5,8 @@
 **/.env
 **/.env.*
 !**/.env.example
+fcm-test/service-account.json
+apps/app-campo-flutter/android/app/google-services.json
 *.pem
 *.key
 *.p12
@@ -90,6 +92,14 @@ temp/
 *.sqlite3
 *.db
 docker-data/
+
+# Database backups may contain candidate personal data; keep them local.
+/infra/postgres/backups/*
+!/infra/postgres/backups/.gitkeep
+/infra/mongodb/backups/*
+!/infra/mongodb/backups/.gitkeep
+/infra/dynamodb/backups/*
+!/infra/dynamodb/backups/.gitkeep
 
 # Local agent/editor metadata
 .codex/

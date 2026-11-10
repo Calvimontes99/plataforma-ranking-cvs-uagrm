@@ -7,6 +7,8 @@ export interface IngestCvCommand {
   channel: 'web' | 'mobile' | 'whatsapp';
   fileName?: string;
   contentType?: string;
+  applicant?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
   data: Record<string, unknown> | Buffer;
 }
 

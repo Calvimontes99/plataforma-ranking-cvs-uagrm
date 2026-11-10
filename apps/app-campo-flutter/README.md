@@ -12,6 +12,40 @@ flutter pub get
 flutter run
 ```
 
+## Notificaciones push (Android / FCM)
+
+La app solicita permiso de notificaciones (incluido Android 13+), obtiene el
+token de la instalación y escucha mensajes en primer plano, segundo plano y al
+abrirse desde una notificación. Para habilitarlo en un proyecto real:
+
+1. Crea/selecciona un proyecto en Firebase Console y registra una app Android
+   cuyo package name sea `com.example.app_campo` (el `applicationId` actual).
+2. Instala/inicia sesión con Firebase CLI y FlutterFire CLI, y desde esta
+   carpeta ejecuta `flutterfire configure`. Selecciona Android. Esto genera la
+   configuración Firebase y aplica los ajustes Android requeridos.
+3. Confirma que `android/app/google-services.json` está disponible localmente,
+   luego ejecuta `flutter pub get` y reconstruye la app. No subas ese archivo
+   si la política del proyecto lo excluye.
+4. Para probar en un Honor Magic 8 Lite, instala la app desde un build de
+   depuración y acepta el permiso de notificaciones. El dispositivo debe tener
+   los servicios de Google Play activos para recibir FCM.
+
+`PushNotificationService.instance.getToken()` expone el token FCM actual y
+`onTokenRefresh` informa cuando cambia. En el login/registro del reclutador,
+envíenlo autenticado al endpoint de dispositivos del backend (por ejemplo,
+`POST /api/devices` con `{ "token": "...", "platform": "android" }`). El
+endpoint y la asociación a usuario aún dependen del contrato del backend; el
+token se muestra como estado en la pantalla de captura para verificar que se
+obtuvo, pero no se registra ni envía automáticamente.
+
+Los mensajes de tipo `notification` los muestra Android automáticamente cuando
+la app está en background/cerrada. En foreground se muestran como notificación
+local. Los mensajes data-only se convierten en notificación local en foreground
+y background. Para n8n se recomienda enviar `notification.title` y
+`notification.body`, junto con `data.type` (por ejemplo `sync_completed` o
+`priority_vacancy`) y el identificador relacionado. Al tocar el aviso, el tipo
+de payload queda disponible en el handler para conectar navegación por ruta.
+
 El emulador Android usa `http://10.0.2.2:8080` por defecto. Para un dispositivo
 físico conectado por ADB, configura el gateway con:
 

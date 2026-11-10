@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 import '../models/candidate_capture.dart';
 import 'local_database.dart';
@@ -16,18 +17,45 @@ class IngestionApiClient {
   final String _baseUrl;
   final http.Client _client;
 
-  Future<http.Response> ingest(CandidateCapture capture) {
-    final uri = Uri.parse('$_baseUrl/api/v1/ingestion/cvs');
+  Future<http.Response> ingest(CandidateCapture capture) async {
+    final hasAttachment = capture.attachmentPath?.isNotEmpty ?? false;
+    final uri = Uri.parse(
+      hasAttachment
+          ? '$_baseUrl/api/v1/ingestion/cvs/upload'
+          : '$_baseUrl/api/v1/ingestion/cvs',
+    );
+    final headers = {
+      'Accept': 'application/json',
+      'X-Idempotency-Key': capture.idempotencyKey,
+      'Idempotency-Key': capture.idempotencyKey,
+    };
+
+    if (hasAttachment) {
+      final request = http.MultipartRequest('POST', uri)
+        ..headers.addAll(headers);
+      request.fields.addAll({
+        'candidateId': capture.id,
+        'channel': 'mobile',
+        'applicantName': capture.name,
+        'localCvScore': capture.localCvScore.toString(),
+        'interviewScore': capture.interviewScore.toString(),
+        'capturedAt': capture.createdAt.toIso8601String(),
+        if (capture.vacancyId.isNotEmpty) 'vacancyId': capture.vacancyId,
+      });
+      request.files.add(await http.MultipartFile.fromPath(
+        'file',
+        capture.attachmentPath!,
+        filename: capture.attachmentName,
+        contentType: MediaType.parse(
+          capture.attachmentContentType ?? 'application/octet-stream',
+        ),
+      ));
+      return http.Response.fromStream(await _client.send(request));
+    }
+
     return _client.post(
       uri,
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        // The gateway/backend currently reads Idempotency-Key. Sending both
-        // keeps the mobile contract explicit and remains backwards compatible.
-        'X-Idempotency-Key': capture.idempotencyKey,
-        'Idempotency-Key': capture.idempotencyKey,
-      },
+      headers: {...headers, 'Content-Type': 'application/json'},
       body: jsonEncode(capture.toRequestBody()),
     );
   }

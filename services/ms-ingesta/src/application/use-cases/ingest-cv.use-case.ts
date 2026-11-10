@@ -67,13 +67,16 @@ export class IngestCvUseCase implements IngestCvUseCasePort {
       };
     }
     warnings.push(...extracted.warnings);
-    const applicant = !Buffer.isBuffer(input) && typeof input['applicant'] === 'object' && input['applicant'] !== null
-      ? input['applicant'] as Record<string, unknown>
-      : {};
+    const applicant = command.applicant || (
+      !Buffer.isBuffer(input) && typeof input['applicant'] === 'object' && input['applicant'] !== null
+        ? input['applicant'] as Record<string, unknown>
+        : {}
+    );
     const document = new CurriculumDocument(
       resumeId,
       { ...applicant, candidateId } as CurriculumDocument['applicant'],
       {
+        ...(command.metadata || {}),
         ...(Buffer.isBuffer(input) ? { binaryBase64: input.toString('base64') } : input),
         ...(extracted.additionalData ? { aiAdditionalData: extracted.additionalData } : {}),
         fileName: command.fileName,

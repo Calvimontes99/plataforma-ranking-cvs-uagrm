@@ -32,12 +32,26 @@ export class IngestionController {
     @Headers('idempotency-key') idempotencyKey: string,
   ) {
     if (!file) throw new BadRequestException('El archivo CV es obligatorio');
-    if (!['application/pdf', 'image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
-      throw new BadRequestException('Formato no permitido; use PDF o imagen JPEG, PNG o WebP');
+    if (![
+      'application/pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+    ].includes(file.mimetype)) {
+      throw new BadRequestException('Formato no permitido; use PDF, DOCX o imagen JPEG, PNG o WebP');
     }
     return this.ingestCv.execute({
       idempotencyKey, candidateId: body.candidateId, vacancyId: body.vacancyId,
       channel: body.channel || 'web', fileName: file.originalname, contentType: file.mimetype, data: file.buffer,
+      applicant: body.applicantName
+        ? { candidateId: body.candidateId, fullName: body.applicantName }
+        : undefined,
+      metadata: {
+        ...(body.localCvScore !== undefined ? { localCvScore: Number(body.localCvScore) } : {}),
+        ...(body.interviewScore !== undefined ? { interviewScore: Number(body.interviewScore) } : {}),
+        ...(body.capturedAt ? { capturedAt: body.capturedAt } : {}),
+      },
     });
   }
 

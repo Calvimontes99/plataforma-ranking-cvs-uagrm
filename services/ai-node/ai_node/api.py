@@ -85,6 +85,7 @@ def _extraction_json(result: Any) -> dict[str, Any]:
     }
 
 
+@router.get("/api/v1/ai/health")
 @router.get("/health")
 async def health(request: Request) -> dict[str, Any]:
     return {
