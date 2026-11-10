@@ -20,8 +20,11 @@ export class SagaCommandConsumer implements OnModuleInit, OnModuleDestroy {
       this.connection = connection;
       const channel = await connection.createChannel();
       this.channel = channel;
+      const exchange = process.env.RABBITMQ_EXCHANGE || 'recruitment.events';
       const queue = process.env.RABBITMQ_SAGA_QUEUE || 'ingesta.saga.commands';
+      await channel.assertExchange(exchange, 'topic', { durable: true });
       await channel.assertQueue(queue, { durable: true });
+      await channel.bindQueue(queue, exchange, queue);
       await channel.prefetch(1);
       await channel.consume(queue, (message) => {
         if (message) void this.handleMessage(message);

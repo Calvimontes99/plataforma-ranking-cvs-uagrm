@@ -1,16 +1,16 @@
-Para volver a levantar todo (rápido, sin reconstruir):
+--> Para volver a levantar todo (rápido, sin reconstruir):
 
 bash
 docker compose -f infra/docker-compose.yml --profile demo up -d
 
-Para apagar/pausar todo cuando termines de trabajar (sin perder tus bases de datos):
+--> Para apagar/pausar todo cuando termines de trabajar (sin perder tus bases de datos):
 
 bash
 docker compose -f infra/docker-compose.yml --profile demo stop
 
 (Importante: nunca uses down -v, porque el -v borra los volúmenes de las bases de datos).
 
-Para ver si todos los contenedores ya están listos (healthy):
+-->Para ver si todos los contenedores ya están listos (healthy):
 
 bash
 docker compose -f infra/docker-compose.yml --profile demo ps

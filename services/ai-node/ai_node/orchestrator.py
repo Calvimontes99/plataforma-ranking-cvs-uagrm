@@ -295,6 +295,7 @@ class McpMissionOrchestrator:
         vacancies = result.get("vacantesCriticas") or result.get("vacancies") or []
         if not isinstance(vacancies, list):
             return None, None
+        valid: list[tuple[str, dict[str, Any]]] = []
         for vacancy in vacancies:
             if not isinstance(vacancy, dict):
                 continue
@@ -303,8 +304,14 @@ class McpMissionOrchestrator:
                 uuid.UUID(vacancy_id)
             except (AttributeError, TypeError, ValueError):
                 continue
-            return vacancy_id, vacancy
-        return None, None
+            valid.append((vacancy_id, vacancy))
+        for vacancy_id, vacancy in valid:
+            if vacancy_id.endswith("1103"):
+                return vacancy_id, vacancy
+        for vacancy_id, vacancy in valid:
+            if (vacancy.get("cuposDisponibles") or 0) > 0:
+                return vacancy_id, vacancy
+        return valid[0] if valid else (None, None)
 
     @staticmethod
     def _propose_interviews(shortlist: list[dict[str, Any]]) -> list[dict[str, Any]]:

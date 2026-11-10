@@ -34,7 +34,7 @@ final class CalculateAndRankCandidateUseCase
         $now = new DateTimeImmutable();
         $existing = $this->rankings->find($input['vacancyId'], $input['candidateId']);
         if ($existing !== null && $existing->estado === RankingStatus::SELECCIONADO) {
-            throw new InvalidArgumentException('No se puede recalcular un candidato seleccionado');
+            return $this->present($existing, 1);
         }
         $entry = new RankingEntry(
             $input['vacancyId'],

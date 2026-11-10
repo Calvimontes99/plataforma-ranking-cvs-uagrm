@@ -12,6 +12,6 @@ export const CANDIDATES = gql`query Postulantes($vacanteId: ID!) { postulantesPr
 
 export async function postJson<T>(url: string, body: unknown, idempotencyKey = crypto.randomUUID()): Promise<T> {
   const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey, ...bearer() }, body: JSON.stringify(body) });
-  if (response.status !== 200 && response.status !== 201) throw new Error((await response.text()) || `HTTP ${response.status}`);
+  if (!response.ok) throw new Error((await response.text()) || `HTTP ${response.status}`);
   return response.json() as Promise<T>;
 }

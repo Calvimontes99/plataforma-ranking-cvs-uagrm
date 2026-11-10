@@ -17,10 +17,10 @@ final class AuditLogEntry
 
     public function toArray(): array
     {
-        return [
+        return array_filter([
             'auditId' => $this->auditId, 'action' => $this->action,
             'aggregateId' => $this->aggregateId, 'details' => $this->details,
             'occurredAt' => $this->occurredAt->format(DATE_ATOM), 'sagaId' => $this->sagaId,
-        ];
+        ], static fn ($value): bool => $value !== null);
     }
 }
