@@ -187,7 +187,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       GRPC_PORT: 9091
-      MONGODB_URI: mongodb://${MONGO_ROOT_USER:-platform_admin}:${MONGO_ROOT_PASSWORD:-platform_admin_dev}@mongodb:27017/${MONGO_DATABASE:-ingestion_db}?authSource=admin&replicaSet=rs0
+      MONGODB_URI: ${MS_INGESTA_MONGODB_URI:-mongodb://platform_admin:platform_admin_dev@mongodb:27017/ingestion_db?authSource=admin&replicaSet=rs0}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-platform_user}:${RABBITMQ_PASSWORD:-platform_dev}@rabbitmq:5672/${RABBITMQ_VHOST:-recruitment}
       RABBITMQ_EXCHANGE: recruitment.events
       RABBITMQ_SAGA_QUEUE: ingesta.saga.commands
