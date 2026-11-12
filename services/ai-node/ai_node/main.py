@@ -9,6 +9,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from ai_node import __version__
 from ai_node.api import router
+from ai_node.candidate_screening import CandidateScreeningAgent
 from ai_node.inference import AiInference
 from ai_node.orchestrator import DownstreamServices, McpMissionOrchestrator
 
@@ -17,6 +18,7 @@ def create_app(start_grpc: bool = True) -> FastAPI:
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         application.state.inference = AiInference()
+        application.state.candidate_screening_agent = CandidateScreeningAgent()
         application.state.orchestrator = McpMissionOrchestrator(
             DownstreamServices(
                 vacancies_url=os.getenv("VACANCIES_MCP_URL", ""),

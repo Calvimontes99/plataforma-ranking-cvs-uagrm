@@ -36,8 +36,10 @@ Usuarios del realm `recruitment`, definidos en `infra/keycloak/realm-recruitment
 
 | Usuario | Contraseña | Roles |
 |---|---|---|
-| `rrhh.demo` | `Demo123!` | `RRHH`, `AI_AGENT` |
-| `docente.demo` | `Demo123!` | `RRHH` |
+| `rrhh.demo` | `Demo123!` | `ADMIN`, `RRHH` |
+| `docente.demo` | `Demo123!` | `AI_AGENT` |
+
+El Portal requiere una sesión y ofrece auto-registro en Keycloak; las cuentas nuevas reciben `CANDIDATE`. El ERP acepta `RRHH`/`ADMIN` y dirige `AI_AGENT` a su espacio de agentes. Ambos usan OIDC por el gateway `localhost:8080`; el puerto publicado `8081` es solo acceso directo opcional a Keycloak.
 
 Administrador de Keycloak para desarrollo: `admin` / `admin_dev`. RabbitMQ Management está disponible directamente en http://localhost:15672 con `platform_user` / `platform_dev`.
 
@@ -48,7 +50,7 @@ Administrador de Keycloak para desarrollo: `admin` / `admin_dev`. RabbitMQ Manag
 3. En **Misión inteligente**, ejecute la misión precargada. **Especialista DevSecOps** tiene una apertura de 21 días y debe aparecer como vacante crítica mediante MCP.
 4. Abra BI y use: `candidatos con puntaje mayor a 80 y salario menor a 12000`. Muestre después la exportación XLSX o PDF.
 5. Pruebe el bloqueo de inyección con: `DROP TABLE candidatos;` y contraste con la consulta válida.
-6. Abra el Portal PWA, active la simulación de red inestable y muestre que los tres reintentos conservan el mismo `Idempotency-Key`.
+6. Abra el Portal PWA e inicie sesión con una cuenta `CANDIDATE` auto-registrada. Active la simulación de red inestable y muestre que los tres reintentos conservan el mismo `Idempotency-Key`.
 
 IDs estables útiles durante la explicación:
 

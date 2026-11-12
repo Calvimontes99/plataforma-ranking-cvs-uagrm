@@ -18,9 +18,12 @@ class IngestionApiClient {
   final http.Client _client;
 
   Future<http.Response> ingest(CandidateCapture capture) async {
-    final hasAttachment = capture.attachmentPath?.isNotEmpty ?? false;
+    final documentPath = capture.attachmentPath;
+    final photoPath = capture.imagePath;
+    final filePath = documentPath?.isNotEmpty == true ? documentPath : photoPath;
+    final hasFile = filePath?.isNotEmpty == true;
     final uri = Uri.parse(
-      hasAttachment
+      hasFile
           ? '$_baseUrl/api/v1/ingestion/cvs/upload'
           : '$_baseUrl/api/v1/ingestion/cvs',
     );
@@ -30,7 +33,12 @@ class IngestionApiClient {
       'Idempotency-Key': capture.idempotencyKey,
     };
 
-    if (hasAttachment) {
+    if (hasFile) {
+      final isDocument = documentPath?.isNotEmpty == true;
+      final fileName = isDocument ? capture.attachmentName ?? 'cv' : 'candidate-photo${_extension(photoPath)}';
+      final contentType = isDocument
+          ? capture.attachmentContentType ?? 'application/octet-stream'
+          : _imageContentType(photoPath);
       final request = http.MultipartRequest('POST', uri)
         ..headers.addAll(headers);
       request.fields.addAll({
@@ -44,11 +52,9 @@ class IngestionApiClient {
       });
       request.files.add(await http.MultipartFile.fromPath(
         'file',
-        capture.attachmentPath!,
-        filename: capture.attachmentName,
-        contentType: MediaType.parse(
-          capture.attachmentContentType ?? 'application/octet-stream',
-        ),
+        filePath!,
+        filename: fileName,
+        contentType: MediaType.parse(contentType),
       ));
       return http.Response.fromStream(await _client.send(request));
     }
@@ -59,6 +65,30 @@ class IngestionApiClient {
       body: jsonEncode(capture.toRequestBody()),
     );
   }
+
+  Future<void> registerDeviceToken(String token, {String platform = 'unknown'}) async {
+    final uri = Uri.parse('$_baseUrl/api/v1/notifications/register-token');
+    final response = await _client.post(
+      uri,
+      headers: const {'Accept': 'application/json', 'Content-Type': 'application/json'},
+      body: jsonEncode({'token': token, 'platform': platform}),
+    );
+    if (response.statusCode != 200 && response.statusCode != 201) {
+      throw http.ClientException('Token registration failed: HTTP ${response.statusCode}', uri);
+    }
+  }
+
+  String _extension(String? path) {
+    if (path == null) return '.jpg';
+    final dot = path.lastIndexOf('.');
+    return dot < 0 ? '.jpg' : path.substring(dot).toLowerCase();
+  }
+
+  String _imageContentType(String? path) => switch (_extension(path)) {
+        '.png' => 'image/png',
+        '.webp' => 'image/webp',
+        _ => 'image/jpeg',
+      };
 
   void close() => _client.close();
 }

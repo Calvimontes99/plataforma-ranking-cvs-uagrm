@@ -154,7 +154,7 @@ class McpMissionOrchestrator:
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self.services = services
-        self.client = client or httpx.AsyncClient(timeout=httpx.Timeout(4.0, connect=1.5))
+        self.client = client or httpx.AsyncClient(timeout=httpx.Timeout(30.0, connect=1.5))
         self.owns_client = client is None
         self.context_memory: dict[str, dict[str, Any]] = {}
 
@@ -370,8 +370,23 @@ class McpMissionOrchestrator:
                 result["resources"] = resource_result
             result["discoveredTools"] = [item.get("name") for item in available_tools if isinstance(item, dict)]
             return result
+        except httpx.TimeoutException as exc:
+            return {
+                "ok": False,
+                "tool": tool_name,
+                "error": f"{service} MCP agotó el tiempo de espera ({type(exc).__name__})",
+            }
+        except httpx.HTTPStatusError as exc:
+            detail = exc.response.text.strip()[:200]
+            suffix = f": {detail}" if detail else ""
+            return {
+                "ok": False,
+                "tool": tool_name,
+                "error": f"{service} MCP respondió HTTP {exc.response.status_code}{suffix}",
+            }
         except (httpx.HTTPError, ValueError) as exc:
-            return {"ok": False, "tool": tool_name, "error": f"{service} MCP no disponible: {str(exc)[:200]}"}
+            detail = str(exc).strip() or type(exc).__name__
+            return {"ok": False, "tool": tool_name, "error": f"{service} MCP no disponible: {detail[:200]}"}
 
     @staticmethod
     def _vacancy_skill_hints(result: Any) -> list[str]:

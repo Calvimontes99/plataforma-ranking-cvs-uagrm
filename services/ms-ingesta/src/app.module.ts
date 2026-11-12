@@ -12,6 +12,10 @@ import { IdempotencyPort } from './application/ports/out/idempotency.port';
 import { UnitOfWorkPort } from './application/ports/out/unit-of-work.port';
 import { AI_NODE_CLIENT, CURRICULUM_REPOSITORY, IDEMPOTENCY, OUTBOX_REPOSITORY, POSTULACION_REPOSITORY, UNIT_OF_WORK } from './infrastructure/tokens';
 import { IngestionController } from './infrastructure/adapters/in/http/ingestion.controller';
+import { NotificationsController } from './infrastructure/adapters/in/http/notifications.controller';
+import { NotificationsService } from './infrastructure/adapters/in/http/notifications.service';
+import { DeviceTokenRecord, DeviceTokenSchema } from './infrastructure/adapters/out/persistence/schemas';
+import { NotificationEventConsumer } from './infrastructure/adapters/in/messaging/notification-event.consumer';
 import { McpController } from './infrastructure/adapters/in/http/mcp.controller';
 import { HealthController } from './infrastructure/adapters/in/http/health.controller';
 import { IdempotencyGuard } from './infrastructure/adapters/in/http/idempotency.guard';
@@ -48,8 +52,9 @@ const useCases = [
     MongooseModule.forRoot(process.env.MONGODB_URI || 'mongodb://localhost:27017/ingestion_db'),
     PrometheusModule.register({ path: '/metrics' }),
     PersistenceModule,
+    MongooseModule.forFeature([{ name: DeviceTokenRecord.name, schema: DeviceTokenSchema }]),
   ],
-  controllers: [IngestionController, McpController, HealthController, IngestionGrpcController],
+  controllers: [IngestionController, NotificationsController, McpController, HealthController, IngestionGrpcController],
   providers: [
     ...useCases,
     IdempotencyGuard,
@@ -58,6 +63,8 @@ const useCases = [
     { provide: AI_NODE_CLIENT, useExisting: AiNodeGrpcAdapter },
     OutboxPoller,
     SagaCommandConsumer,
+    NotificationsService,
+    NotificationEventConsumer,
   ],
 })
 export class AppModule {}

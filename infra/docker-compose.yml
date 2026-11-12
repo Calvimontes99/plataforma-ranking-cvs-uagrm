@@ -22,7 +22,7 @@ services:
       KEYCLOAK_DB_USER: ${KEYCLOAK_DB_USER:-keycloak_user}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:-keycloak_dev}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
@@ -128,6 +128,7 @@ services:
       - "${KEYCLOAK_PORT:-8081}:8080"
     volumes:
       - ./keycloak/realm-recruitment.json:/opt/keycloak/data/import/realm-recruitment.json:ro
+      - ./keycloak/themes/recruitment:/opt/keycloak/themes/recruitment:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -192,6 +193,9 @@ services:
       RABBITMQ_EXCHANGE: recruitment.events
       RABBITMQ_SAGA_QUEUE: ingesta.saga.commands
       AI_NODE_GRPC_URL: ${AI_NODE_GRPC_URL:-ai-node:50051}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      NOTIFICATIONS_QUEUE: notifications.events
       MS_RANKING_GRPC_URL: ${MS_RANKING_GRPC_URL:-ms-ranking:50052}
       OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-1000}
     ports:

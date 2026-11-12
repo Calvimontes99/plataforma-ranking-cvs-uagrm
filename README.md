@@ -73,6 +73,8 @@ Esta sección describe el comportamiento que se encuentra en el código del repo
 
 Nginx es la entrada HTTP del stack y se publica en el puerto `8080`. Enruta las interfaces web bajo `/erp/`, `/bi/` y `/portal/`; Keycloak bajo `/auth/`; n8n bajo `/automation/`; y las API versionadas de vacantes, ingesta, ranking, IA y lectura bajo `/api/v1/`. También expone `/health`. Los servicios publican contratos HTTP y, donde está configurado, gRPC; los eventos de dominio circulan por RabbitMQ.
 
+ERP y Portal requieren una sesión OIDC del realm `recruitment` a través del gateway (`http://localhost:8080/auth/`). Los roles `ADMIN` y `RRHH` dan acceso de gestión al ERP; `AI_AGENT` entra al espacio de agentes; `CANDIDATE` accede al Portal. El auto-registro del realm está habilitado y asigna `CANDIDATE` como rol predeterminado. BI se mantiene disponible bajo `/bi/`.
+
 | Servicio | Responsabilidad | Persistencia principal |
 | --- | --- | --- |
 | `ms-vacantes` (Spring Boot) | Vacantes, disponibilidad de cupos, preaprobaciones, contratos y participante final de adjudicación. Expone REST, GraphQL y gRPC. | PostgreSQL |
@@ -346,8 +348,10 @@ Credenciales del realm `recruitment`:
 
 | Usuario          | Contraseña  | Roles                  |
 | ---------------- | ------------ | ---------------------- |
-| `rrhh.demo`    | `Demo123!` | `RRHH`, `AI_AGENT` |
-| `docente.demo` | `Demo123!` | `RRHH`               |
+| `rrhh.demo`    | `Demo123!` | `ADMIN`, `RRHH` |
+| `docente.demo` | `Demo123!` | `AI_AGENT` |
+
+Las cuentas nuevas se registran desde el formulario de Keycloak y reciben el rol `CANDIDATE`; no obtienen acceso al ERP.
 
 La guía completa para la presentación está en [`RUN_DEMO.md`](RUN_DEMO.md).
 

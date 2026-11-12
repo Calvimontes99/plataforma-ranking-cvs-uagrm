@@ -56,3 +56,13 @@ export class IdempotencyRecord {
 }
 export type IdempotencyRecordDocument = HydratedDocument<IdempotencyRecord>;
 export const IdempotencyRecordSchema = SchemaFactory.createForClass(IdempotencyRecord);
+
+@Schema({ collection: 'device_tokens', timestamps: true })
+export class DeviceTokenRecord {
+  @Prop({ required: true, unique: true, index: true, maxlength: 4096 }) token!: string;
+  @Prop({ default: 'unknown', maxlength: 32 }) platform!: string;
+  @Prop({ index: true, maxlength: 200 }) userId?: string;
+  @Prop({ default: true, index: true }) active!: boolean;
+}
+export type DeviceTokenRecordDocument = HydratedDocument<DeviceTokenRecord>;
+export const DeviceTokenSchema = SchemaFactory.createForClass(DeviceTokenRecord);

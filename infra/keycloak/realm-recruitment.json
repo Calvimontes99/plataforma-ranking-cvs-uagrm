@@ -1,13 +1,31 @@
 {
   "realm": "recruitment",
   "enabled": true,
-  "displayName": "Recruitment Platform",
-  "registrationAllowed": false,
+  "displayName": "Plataforma de Reclutamiento · UAGRM",
+  "loginTheme": "recruitment",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["es", "en"],
+  "defaultLocale": "es",
+  "registrationAllowed": true,
   "loginWithEmailAllowed": true,
   "roles": {
     "realm": [
       { "name": "RRHH" },
-      { "name": "AI_AGENT" }
+      { "name": "AI_AGENT" },
+      { "name": "ADMIN" },
+      { "name": "CANDIDATE" },
+      {
+        "name": "default-roles-recruitment",
+        "description": "${role_default-roles}",
+        "composite": true,
+        "clientRole": false,
+        "composites": {
+          "realm": ["offline_access", "uma_authorization", "CANDIDATE"],
+          "client": {
+            "account": ["manage-account", "view-profile"]
+          }
+        }
+      }
     ]
   },
   "clientScopes": [
@@ -63,7 +81,25 @@
       "standardFlowEnabled": true,
       "directAccessGrantsEnabled": false,
       "redirectUris": ["http://localhost:8080/portal/*"],
-      "webOrigins": ["http://localhost:8080"]
+      "webOrigins": ["http://localhost:8080"],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:8080/portal/"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -75,7 +111,7 @@
       "enabled": true,
       "emailVerified": true,
       "credentials": [{ "type": "password", "value": "Demo123!", "temporary": false }],
-      "realmRoles": ["RRHH"]
+      "realmRoles": ["ADMIN", "RRHH"]
     },
     {
       "username": "docente.demo",
