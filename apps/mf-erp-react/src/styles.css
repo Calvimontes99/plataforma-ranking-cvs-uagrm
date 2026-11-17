@@ -83,3 +83,41 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .muted { color: #94a3b8; font-size: .85rem; margin: 0; }
 .mission-json-view { background: #0d1b29; border: 1px solid #263d55; border-radius: 12px; padding: 14px; }
 .mission-json-view pre { margin: 0; max-height: 460px; overflow: auto; padding: 0; }
+
+.section-desc { color: #94a3b8; font-size: 0.88rem; line-height: 1.5; margin: 4px 0 16px; }
+.preset-container { margin: 14px 0 16px; }
+.preset-label { display: block; color: #93c5fd; font-weight: 700; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.preset-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+.chip-btn { background: #1e364d; border: 1px solid #3b5a77; color: #dbeafe; padding: 8px 14px; border-radius: 20px; font-size: 0.82rem; cursor: pointer; transition: all 0.2s ease; }
+.chip-btn:hover { background: #284766; border-color: #60a5fa; color: #fff; transform: translateY(-1px); }
+.chip-btn.active { background: #1d4ed8; border-color: #93c5fd; color: #fff; font-weight: 700; box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
+.chip-btn small { opacity: 0.85; font-size: 0.74rem; font-weight: normal; }
+.btn-execute { background: #0284c7; color: white; padding: 12px 20px; font-size: 0.92rem; font-weight: 800; border-radius: 10px; margin-top: 10px; border: 0; cursor: pointer; transition: 0.2s; }
+.btn-execute:hover:not(:disabled) { background: #0369a1; transform: translateY(-1px); }
+
+.screening-decision-card { margin-top: 20px; padding: 22px; background: #102133; border: 1px solid #233e59; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+.decision-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.decision-header h4 { margin: 4px 0 0; color: #f8fafc; font-size: 1.15rem; font-weight: 600; }
+.decision-header h4 strong { color: #60a5fa; }
+.decision-badge { padding: 8px 16px; border-radius: 999px; font-weight: 850; font-size: 0.88rem; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
+.badge-top { background: #064e3b; color: #34d399; border: 1px solid #059669; box-shadow: 0 0 12px rgba(52, 211, 153, 0.25); }
+.badge-standard { background: #451a03; color: #fbbf24; border: 1px solid #d97706; }
+.badge-rejected { background: #450a0a; color: #f87171; border: 1px solid #dc2626; }
+.decision-recommendation { margin: 14px 0 20px; color: #e2e8f0; font-size: 0.95rem; line-height: 1.6; background: #162c44; padding: 14px 18px; border-radius: 10px; border-left: 4px solid #3b82f6; }
+
+.criteria-breakdown { margin-top: 18px; padding-top: 18px; border-top: 1px solid #233e59; }
+.criteria-breakdown h5 { margin: 0 0 14px; color: #93c5fd; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.05em; }
+.criteria-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.criteria-item { background: #172d42; border: 1px solid #284766; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.criteria-title { color: #94a3b8; font-size: 0.82rem; font-weight: 600; }
+.criteria-val { font-size: 1.35rem; color: #f8fafc; }
+.criteria-hint { color: #cbd5e1; font-size: 0.78rem; line-height: 1.4; }
+.skills-tags { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+.skill-tag { padding: 4px 9px; border-radius: 6px; font-size: 0.78rem; font-family: ui-monospace, monospace; font-weight: 700; }
+.skill-tag.matched { background: #064e3b; color: #6ee7b7; border: 1px solid #059669; }
+.skill-tag.missing { background: #334155; color: #94a3b8; border: 1px solid #475569; }
+.score-bar-bg { width: 100%; height: 8px; background: #0f172a; border-radius: 999px; overflow: hidden; margin-top: 2px; }
+.score-bar-fill { height: 100%; background: linear-gradient(90deg, #3b82f6, #10b981); border-radius: 999px; transition: width 0.4s ease; }
+.decision-footer { margin-top: 18px; display: flex; flex-direction: column; gap: 10px; }
+.decision-footer pre { max-height: 260px; overflow: auto; background: #0a131e; color: #6ee7b7; padding: 12px; border-radius: 10px; font-size: 0.8rem; margin: 0; }
+

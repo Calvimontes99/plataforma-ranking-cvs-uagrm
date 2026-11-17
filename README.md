@@ -195,14 +195,28 @@ El archivo es una plantilla importable, pero actualmente figura con `active: fal
 
 Entradas principales:
 
-- ERP: [http://localhost:8080/erp/](http://localhost:8080/erp/)
-- BI: [http://localhost:8080/bi/](http://localhost:8080/bi/)
-- Portal PWA: [http://localhost:8080/portal/](http://localhost:8080/portal/)
-- Keycloak: [http://localhost:8080/auth/](http://localhost:8080/auth/)
-- n8n: [http://localhost:8080/automation/](http://localhost:8080/automation/)
+**En Local (PC de desarrollo):**
+- Landing institucional: [http://localhost:8080/layout/](http://localhost:8080/layout/)
+- ERP React (RRHH y Agentes): [http://localhost:8080/erp/](http://localhost:8080/erp/)
+- BI Angular (Reportes y Voz): [http://localhost:8080/bi/](http://localhost:8080/bi/)
+- Portal PWA (Candidatos): [http://localhost:8080/portal/](http://localhost:8080/portal/)
+- Keycloak SSO: [http://localhost:8080/auth/](http://localhost:8080/auth/)
+- n8n Automatizaciones: [http://localhost:8080/automation/](http://localhost:8080/automation/)
 - Healthcheck del gateway: [http://localhost:8080/health](http://localhost:8080/health)
 - Prometheus: [http://localhost:9092/](http://localhost:9092/)
 - Grafana: [http://localhost:3001/](http://localhost:3001/) (`admin` / `admin`)
+
+**En el Servidor Cloud de Azure (`cv-talento-uagrm.westus2.cloudapp.azure.com`):**
+> [!NOTE]
+> El servidor opera mediante HTTP plano (no https). Escribe explícitamente `http://` en el navegador.
+
+- Landing institucional: [http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/layout/](http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/layout/) (o [http://cv-talento-uagrm.westus2.cloudapp.azure.com/layout/](http://cv-talento-uagrm.westus2.cloudapp.azure.com/layout/))
+- ERP React (RRHH y Agentes): [http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/erp/](http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/erp/) (o [http://cv-talento-uagrm.westus2.cloudapp.azure.com/erp/](http://cv-talento-uagrm.westus2.cloudapp.azure.com/erp/))
+- BI Angular (Reportes y Voz): [http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/bi/](http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/bi/)
+- Portal PWA (Candidatos): [http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/portal/](http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/portal/)
+- Keycloak SSO: [http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/auth/](http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/auth/)
+- n8n Automatizaciones: [http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/automation/](http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/automation/)
+- Healthcheck del gateway: [http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/health](http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/health)
 
 Prometheus recoge `/actuator/prometheus` en `ms-vacantes` y `/metrics` en los demás microservicios. FastAPI y NestJS exponen métricas HTTP instrumentadas; `ms-ranking` publica `ms_ranking_up` como gauge básico de disponibilidad.
 
@@ -331,9 +345,15 @@ Copy-Item "$backupDir\dynamodb.json" .\infra\dynamodb\backups\
 
 En una instalación nueva, inicia el perfil `demo`:
 
+**En Windows (PowerShell local):**
 ```powershell
 $compose = @("-f", ".\infra\docker-compose.yml", "--profile", "demo")
 docker compose @compose up -d
+```
+
+**En el servidor Azure (Linux / Bash):**
+```bash
+docker compose -f infra/docker-compose.yml --profile demo up -d
 ```
 
 Si `postgres_data` está vacío, los scripts de inicialización crean las bases y restauran automáticamente `vacancies.dump` y `read-model.dump` cuando esos archivos existen. La restauración de PostgreSQL se ejecuta solo durante la primera inicialización del volumen. Cuando los servicios estén saludables, ejecuta el restaurador:
@@ -357,26 +377,134 @@ La guía completa para la presentación está en [`RUN_DEMO.md`](RUN_DEMO.md).
 
 ### 4. Detener el stack
 
+**En Windows (PowerShell local):**
 ```powershell
 docker compose @compose --profile demo stop
 ```
 
-El comando `stop` preserva los contenedores y volúmenes del proyecto.
+**En el servidor Azure (Linux / Bash):**
+```bash
+docker compose -f infra/docker-compose.yml --profile demo stop
+```
 
-## Desarrollo y diagnóstico
+El comando `stop` preserva los contenedores y volúmenes del proyecto. Si necesitas reiniciar desde cero, usa `down` (nunca uses `down -v`, ya que el flag `-v` destruye los volúmenes de las bases de datos).
 
+## Desarrollo, diagnóstico y Rebuild de Contenedores
+
+### 1. Comandos para Rebuild (Reconstruir Contenedores)
+
+Cuando se realizan modificaciones en el código fuente de los microservicios o frontends, se debe reconstruir la imagen Docker correspondiente:
+
+**Reconstruir todo el stack completo (todos los servicios):**
+```bash
+# En Windows (PowerShell) o Azure (Linux):
+docker compose -f infra/docker-compose.yml --profile demo up -d --build
+```
+
+**Reconstruir forzando limpieza total (sin usar caché de capas):**
+```bash
+docker compose -f infra/docker-compose.yml --profile demo build --no-cache
+docker compose -f infra/docker-compose.yml --profile demo up -d
+```
+
+**Reconstruir un único contenedor específico (más rápido, sin tocar los demás):**
+```bash
+# Reconstruir solo el Frontend ERP React:
+docker compose -f infra/docker-compose.yml up -d --build mf-erp-react
+
+# Reconstruir solo el Nodo de Inteligencia Artificial (ai-node):
+docker compose -f infra/docker-compose.yml up -d --build ai-node
+
+# Reconstruir solo el API Gateway (Nginx):
+docker compose -f infra/docker-compose.yml up -d --build api-gateway
+
+# Reconstruir solo microservicios individuales:
+docker compose -f infra/docker-compose.yml up -d --build ms-vacantes
+docker compose -f infra/docker-compose.yml up -d --build ms-ingesta
+docker compose -f infra/docker-compose.yml up -d --build ms-ranking
+```
+
+**Reiniciar un contenedor sin recompilar (solo reinicio de proceso):**
+```bash
+docker compose -f infra/docker-compose.yml restart <nombre-servicio>
+```
+
+---
+
+### 2. Monitoreo y Diagnóstico
+
+**En Windows (PowerShell local):**
 ```powershell
 # Estado del perfil demo
 docker compose @compose --profile demo ps
 
-# Logs principales
+# Logs principales en tiempo real
 docker compose @compose --profile demo logs -f api-gateway ms-vacantes ms-ingesta ms-ranking ai-node cqrs-read-service
+```
 
-# Reconstruir un único servicio (requiere autorización para reconstruir)
-docker compose @compose --profile demo up -d --build ms-vacantes
+**En el servidor Azure (Linux / Bash):**
+```bash
+# Estado de todos los contenedores
+docker compose -f infra/docker-compose.yml --profile demo ps
+
+# Logs en tiempo real
+docker compose -f infra/docker-compose.yml --profile demo logs -f api-gateway ms-vacantes ms-ingesta ms-ranking ai-node cqrs-read-service
 ```
 
 Los archivos `.env.example` documentan la configuración individual. Nunca deben versionarse secretos reales, tokens, certificados o archivos `.env` locales.
+
+## Pruebas con Teléfono Móvil Conectado (Android / Flutter)
+
+Para probar la aplicación móvil de campo (`apps/app-campo-flutter`) en un teléfono Android físico conectado por USB o en red local:
+
+### 1. Requisitos previos en el teléfono
+1. Activa las **Opciones de desarrollador** en Android (Ajustes ➔ Acerca del teléfono ➔ presiona 7 veces seguidas sobre el *Número de compilación*).
+2. Entra a *Opciones de desarrollador* y habilita la **Depuración por USB**.
+3. Conecta el teléfono a la PC mediante el cable USB y acepta el mensaje emergente de autorización de huella digital RSA en la pantalla del celular.
+4. Verifica que la PC reconozca el dispositivo conectado ejecutando en PowerShell:
+   ```powershell
+   adb devices
+   ```
+   *(Debe aparecer el identificador de tu teléfono con el estado `device`).*
+
+### 2. Ejecutar contra el entorno LOCAL (Tu PC) con cable USB
+Para que el teléfono alcance el API Gateway local de tu PC (`localhost:8080`), crea un túnel de reenvío de puertos mediante ADB:
+
+```powershell
+# 1. Redirigir el puerto 8080 del teléfono hacia el puerto 8080 de tu PC
+adb reverse tcp:8080 tcp:8080
+
+# 2. Entrar a la carpeta de la app móvil y ejecutar en el teléfono
+cd apps/app-campo-flutter
+flutter run --dart-define=GATEWAY_URL=http://127.0.0.1:8080
+```
+
+> **Alternativa por Wi-Fi Local (Sin adb reverse):** Si el teléfono y la PC están conectados a la misma red Wi-Fi, puedes pasar directamente la dirección IP de tu máquina en la red local:
+> ```powershell
+> cd apps/app-campo-flutter
+> flutter run --dart-define=GATEWAY_URL=http://192.168.1.X:8080
+> ```
+
+### 3. Ejecutar contra el Servidor de AZURE (Cloud)
+Para que el teléfono interactúe directamente con los microservicios desplegados en Azure:
+
+```powershell
+cd apps/app-campo-flutter
+flutter run --dart-define=GATEWAY_URL=http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080
+```
+
+### 4. Compilar el APK instalable independiente
+Si prefieres no depender del cable USB durante la presentación y utilizar la aplicación instalada de forma nativa en tu teléfono:
+
+```powershell
+cd apps/app-campo-flutter
+flutter build apk --release --dart-define=GATEWAY_URL=http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080
+```
+
+El archivo compilado se genera en:
+`apps/app-campo-flutter/build/app/outputs/flutter-apk/app-release.apk`
+
+Envía este archivo `.apk` a tu celular (por WhatsApp, Drive o almacenamiento USB) e instálalo directamente. Permite probar el modo Offline (Modo Avión), sincronización y recepción de notificaciones Push en tiempo real sin cables.
 
 ## Publicación inicial en GitHub
 

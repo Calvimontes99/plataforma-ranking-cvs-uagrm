@@ -22,8 +22,10 @@ Para ver las instrucciones de los perfiles `observability`, `demo` y `full`, sus
 
 ## 2. URLs y credenciales
 
-| Componente | URL por API Gateway |
+### Entradas en Local (PC)
+| Componente | URL por API Gateway (HTTP) |
 |---|---|
+| Landing institucional | http://localhost:8080/layout/ |
 | ERP React | http://localhost:8080/erp/ |
 | BI Angular | http://localhost:8080/bi/ |
 | Portal Vue PWA | http://localhost:8080/portal/ |
@@ -31,6 +33,19 @@ Para ver las instrucciones de los perfiles `observability`, `demo` y `full`, sus
 | Consola del realm | http://localhost:8080/auth/realms/recruitment/account/ |
 | n8n | http://localhost:8080/automation/ |
 | Health del Gateway | http://localhost:8080/health |
+
+### Entradas en el Servidor de Azure (`cv-talento-uagrm.westus2.cloudapp.azure.com`)
+> **Nota:** Usar siempre protocolo `http://` (no https).
+
+| Componente | URL por API Gateway en Azure (HTTP) |
+|---|---|
+| Landing institucional | http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/layout/ (o sin puerto si mapeaste 80) |
+| ERP React | http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/erp/ |
+| BI Angular | http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/bi/ |
+| Portal Vue PWA | http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/portal/ |
+| Keycloak | http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/auth/ |
+| n8n | http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/automation/ |
+| Health del Gateway | http://cv-talento-uagrm.westus2.cloudapp.azure.com:8080/health |
 
 Usuarios del realm `recruitment`, definidos en `infra/keycloak/realm-recruitment.json`:
 

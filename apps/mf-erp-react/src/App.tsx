@@ -25,6 +25,64 @@ const STEP_LABELS: Record<string, string> = {
   'audited-action-plan': '4 · Plan de acción y agenda de entrevistas (ai-node)',
 };
 
+const MISSION_PRESETS = [
+  {
+    title: '🏢 Diagnosticar vacantes críticas',
+    goal: 'Monitorea las vacantes críticas que llevan más de 15 días sin cubrirse y presenta una terna de candidatos viables',
+    skills: [] as string[],
+    intent: 'diagnose_vacancies',
+    vacancyId: undefined as string | undefined,
+  },
+  {
+    title: '🔒 Especialista DevSecOps',
+    goal: 'Evaluar postulantes afines para la vacante de Especialista DevSecOps con cupos disponibles',
+    skills: ['DevSecOps', 'Terraform', 'Kubernetes', 'OWASP'],
+    intent: 'evaluate_vacancy',
+    vacancyId: '11111111-1111-4111-8111-111111111103',
+  },
+  {
+    title: '☁️ Arquitecto Cloud & IA',
+    goal: 'Buscar candidatos con experiencia en Inteligencia Artificial, AWS, Kubernetes y Python',
+    skills: ['AWS', 'Kubernetes', 'Python', 'Inteligencia Artificial'],
+    intent: 'evaluate_vacancy',
+    vacancyId: '11111111-1111-4111-8111-111111111102',
+  },
+  {
+    title: '💻 Ingeniero de Sistemas Senior',
+    goal: 'Evaluar terna técnica con dominio de Java 21, Spring Boot y PostgreSQL para vacante core',
+    skills: ['Java 21', 'Spring Boot', 'PostgreSQL', 'Arquitectura DDD'],
+    intent: 'evaluate_vacancy',
+    vacancyId: '11111111-1111-4111-8111-111111111101',
+  },
+];
+
+const SCREENING_CANDIDATES = [
+  {
+    name: 'Ana Sofía Vargas',
+    role: 'Senior Backend & Cloud (Top Tier)',
+    skills: 'Python, FastAPI, SQL',
+    experience: '6',
+    score: '92',
+    expectedCategory: 'Top Tier',
+  },
+  {
+    name: 'Diego Alejandro Quispe',
+    role: 'Semi-Senior Web (Standard)',
+    skills: 'JavaScript, React, NodeJS',
+    experience: '3',
+    score: '72',
+    expectedCategory: 'Standard',
+  },
+  {
+    name: 'Postulante Inicial (Junior)',
+    role: 'Aspirante sin requisitos mínimos (Rechazado)',
+    skills: 'HTML, CSS',
+    experience: '1',
+    score: '45',
+    expectedCategory: 'Rechazado',
+  },
+];
+
 function candidateName(id?: string, fallbackList?: any[]): string {
   if (!id) return 'Candidato';
   if (CANDIDATE_NAMES[id]) return CANDIDATE_NAMES[id];
@@ -56,7 +114,8 @@ export function App() {
   const [selectedVacancy, setSelectedVacancy] = useState('');
   const [candidate, setCandidate] = useState<Candidate>();
   const [steps, setSteps] = useState<SagaStep[]>([]);
-  const [mission, setMission] = useState('Monitorea las vacantes críticas que llevan más de 15 días sin cubrirse y presenta una terna de candidatos viables');
+  const [mission, setMission] = useState(MISSION_PRESETS[0].goal);
+  const [selectedMissionPreset, setSelectedMissionPreset] = useState<number>(0);
   const [missionResult, setMissionResult] = useState<any>();
   const [showJson, setShowJson] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -71,11 +130,19 @@ export function App() {
     }, controller.signal);
     return () => controller.abort();
   }, [isRrhh, selectedVacancy, candidates.called, vacancies.refetch, loadCandidates]);
-  const [screeningSkills, setScreeningSkills] = useState('Python, FastAPI, SQL');
-  const [screeningExperience, setScreeningExperience] = useState('6');
-  const [screeningScore, setScreeningScore] = useState('92');
+  const [screeningCandidateName, setScreeningCandidateName] = useState(SCREENING_CANDIDATES[0].name);
+  const [screeningSkills, setScreeningSkills] = useState(SCREENING_CANDIDATES[0].skills);
+  const [screeningExperience, setScreeningExperience] = useState(SCREENING_CANDIDATES[0].experience);
+  const [screeningScore, setScreeningScore] = useState(SCREENING_CANDIDATES[0].score);
   const [screeningBusy, setScreeningBusy] = useState(false);
   const [screeningResult, setScreeningResult] = useState<any>();
+  const [screeningShowJson, setScreeningShowJson] = useState(false);
+
+  function applyMissionPreset(index: number) {
+    setSelectedMissionPreset(index);
+    const preset = MISSION_PRESETS[index];
+    setMission(preset.goal);
+  }
 
   async function selectVacancy(id:string) { setSelectedVacancy(id); setCandidate(undefined); setSteps([]); setMissionResult(undefined); setShowJson(false); await loadCandidates({variables:{vacanteId:id}}); }
   async function runSaga(forceRollback=false) {
@@ -96,10 +163,51 @@ export function App() {
     } catch(error) { setSteps(current=>current.map((step,index)=>({...step,state:index===0?'failed':'compensated'}))); setMissionResult({error:String(error)}); }
     finally { setBusy(false); }
   }
+
   async function executeMission() {
     setBusy(true); setShowJson(false);
     try {
-      setMissionResult(await postJson('/agents/execute-mission',{goal:mission,intent:'diagnose_vacancies',limit:20,context:{source:'erp-react'}}));
+      const preset = MISSION_PRESETS.find(p => p.goal === mission);
+      let payload: Record<string, any>;
+      if (preset) {
+        payload = {
+          goal: preset.goal,
+          intent: preset.intent,
+          limit: 20,
+          context: { source: 'erp-react' }
+        };
+        if (preset.vacancyId) payload.vacancyId = preset.vacancyId;
+        if (preset.skills.length > 0) payload.skills = preset.skills;
+      } else {
+        const lower = mission.toLowerCase();
+        let vacancyId: string | undefined;
+        let skills: string[] = [];
+        let intent = 'diagnose_vacancies';
+
+        if (lower.includes('devsecops') || lower.includes('terraform') || lower.includes('owasp')) {
+          vacancyId = '11111111-1111-4111-8111-111111111103';
+          skills = ['DevSecOps', 'Terraform', 'Kubernetes', 'OWASP'];
+          intent = 'evaluate_vacancy';
+        } else if (lower.includes('java') || lower.includes('spring')) {
+          vacancyId = '11111111-1111-4111-8111-111111111101';
+          skills = ['Java 21', 'Spring Boot', 'PostgreSQL', 'Arquitectura DDD'];
+          intent = 'evaluate_vacancy';
+        } else if (lower.includes('kubernetes') || lower.includes('aws') || lower.includes('cloud')) {
+          vacancyId = '11111111-1111-4111-8111-111111111102';
+          skills = ['AWS', 'Kubernetes', 'Python', 'Inteligencia Artificial'];
+          intent = 'evaluate_vacancy';
+        }
+
+        payload = {
+          goal: mission,
+          intent,
+          limit: 20,
+          context: { source: 'erp-react' }
+        };
+        if (vacancyId) payload.vacancyId = vacancyId;
+        if (skills.length > 0) payload.skills = skills;
+      }
+      setMissionResult(await postJson('/agents/execute-mission', payload));
     } catch(e) {
       setMissionResult({error:String(e)});
     } finally {
@@ -110,13 +218,17 @@ export function App() {
   async function screenCandidate() {
     setScreeningBusy(true);
     try {
-      setScreeningResult(await postJson('/api/v1/agents/screen-candidate', {
+      const res = await postJson<any>('/api/v1/agents/screen-candidate', {
         skills: screeningSkills.split(',').map(skill => skill.trim()).filter(Boolean),
         experienceYears: Number(screeningExperience),
         compatibilityScore: Number(screeningScore),
-      }));
+      });
+      setScreeningResult({
+        ...res,
+        candidateName: screeningCandidateName,
+      });
     } catch (error) {
-      setScreeningResult({ error: String(error) });
+      setScreeningResult({ error: String(error), candidateName: screeningCandidateName });
     } finally {
       setScreeningBusy(false);
     }
@@ -151,11 +263,29 @@ export function App() {
         </div>}
       </section>}
       {isAi&&<section className="card agent wide">
-        <span className="eyebrow">MCP HOST · AGENTES</span>
-        <h3>Misión inteligente</h3>
+        <span className="eyebrow">MCP HOST · AGENTES (NIVEL MACRO EMPRESARIAL)</span>
+        <h3>Misión inteligente · Orquestador Cognitivo</h3>
+        <p className="section-desc">El orquestador analiza vacantes, busca candidatos históricos afines mediante herramientas MCP y genera un plan auditado con firma criptográfica.</p>
+        
+        <div className="preset-container">
+          <small className="preset-label">Misiones predefinidas para demostración (1-clic):</small>
+          <div className="preset-chips">
+            {MISSION_PRESETS.map((p, idx) => (
+              <button
+                type="button"
+                key={p.title}
+                className={`chip-btn ${selectedMissionPreset === idx && mission === p.goal ? 'active' : ''}`}
+                onClick={() => applyMissionPreset(idx)}
+              >
+                {p.title}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <textarea value={mission} onChange={e=>setMission(e.target.value)}/>
-        <button onClick={executeMission} disabled={busy}>{busy ? 'Ejecutando misión…' : 'Ejecutar misión'}</button>
-        <div className="skills"><span>diagnosticar_vacantes_criticas</span><span>buscar_candidatos_historicos_afines</span><span>recalcular_puntaje_candidatos</span></div>
+        <button onClick={executeMission} disabled={busy} className="btn-execute">{busy ? 'Ejecutando misión MCP…' : 'Ejecutar misión'}</button>
+        <div className="skills"><span>diagnosticar_vacantes_criticas</span><span>obtener_cupos_vacante</span><span>buscar_candidatos_historicos_afines</span><span>recalcular_puntaje_candidatos</span></div>
         {missionResult&&<div className="mission-report">
           <div className="result-header">
             <div>
@@ -234,22 +364,106 @@ export function App() {
         </div>}
       </section>}
       {isAi&&<section className="card agent wide screening-agent">
-        <span className="eyebrow">AGENTE INDEPENDIENTE · SCREENING</span>
-        <h3>Evaluación individual de postulación</h3>
-        <p>Clasifica una candidatura por skills críticas, experiencia y puntaje de compatibilidad. Umbrales: Top Tier ≥ 85% y 5 años; Standard ≥ 60% y 2 años.</p>
-        <div className="screening-form">
-          <label>Skills (separadas por coma)<input value={screeningSkills} onChange={event => setScreeningSkills(event.target.value)} /></label>
-          <label>Años de experiencia<input type="number" min="0" max="80" step="0.5" value={screeningExperience} onChange={event => setScreeningExperience(event.target.value)} /></label>
-          <label>Compatibilidad (%)<input type="number" min="0" max="100" step="1" value={screeningScore} onChange={event => setScreeningScore(event.target.value)} /></label>
-        </div>
-        <button onClick={screenCandidate} disabled={screeningBusy}>{screeningBusy ? 'Evaluando…' : 'Ejecutar CandidateScreeningAgent'}</button>
-        {screeningResult&&<div className="screening-result" aria-live="polite">
-          <div><span className={`badge ${screeningResult.category === 'Top Tier' ? 'ok' : screeningResult.category === 'Rechazado' || screeningResult.error ? 'warn' : ''}`}>{screeningResult.category ?? 'Error'}</span>
-            <p>{screeningResult.recommendation ?? screeningResult.error}</p>
-            {screeningResult.analysis&&<small>Skills críticas: {screeningResult.analysis.matchedCriticalSkills.join(', ') || 'ninguna'} · Experiencia: {screeningResult.analysis.experienceYears} años · Compatibilidad: {screeningResult.analysis.compatibilityScore}%</small>}
+        <span className="eyebrow">AGENTE INDEPENDIENTE · SCREENING (NIVEL MICRO INDIVIDUAL)</span>
+        <h3>Auditoría de Admisión y Cribado de Postulantes</h3>
+        <p className="section-desc">El CandidateScreeningAgent evalúa de forma autónoma el expediente de un solicitante individual: verifica habilidades críticas core, años de experiencia laboral comprobada y afinidad algorítmica.</p>
+        
+        <div className="preset-container">
+          <small className="preset-label">Expedientes de postulantes para evaluación (1-clic):</small>
+          <div className="preset-chips">
+            {SCREENING_CANDIDATES.map((cand) => (
+              <button
+                type="button"
+                key={cand.name}
+                className={`chip-btn ${screeningCandidateName === cand.name ? 'active' : ''}`}
+                onClick={() => {
+                  setScreeningCandidateName(cand.name);
+                  setScreeningSkills(cand.skills);
+                  setScreeningExperience(cand.experience);
+                  setScreeningScore(cand.score);
+                  setScreeningResult(undefined);
+                  setScreeningShowJson(false);
+                }}
+              >
+                <b>{cand.name}</b> · <small>{cand.expectedCategory}</small>
+              </button>
+            ))}
           </div>
-          <button type="button" className="btn-json" onClick={()=>setShowJson(value=>!value)}>{showJson ? 'Ocultar JSON' : 'Ver JSON'}</button>
-          {showJson&&<pre>{JSON.stringify(screeningResult,null,2)}</pre>}
+        </div>
+
+        <div className="screening-form">
+          <label>Postulante evaluado<input value={screeningCandidateName} onChange={e=>setScreeningCandidateName(e.target.value)} /></label>
+          <label>Skills declaradas en CV<input value={screeningSkills} onChange={e=>setScreeningSkills(e.target.value)} /></label>
+          <label>Años de experiencia<input type="number" min="0" max="80" step="0.5" value={screeningExperience} onChange={e=>setScreeningExperience(e.target.value)} /></label>
+          <label>Compatibilidad IA (%)<input type="number" min="0" max="100" step="1" value={screeningScore} onChange={e=>setScreeningScore(e.target.value)} /></label>
+        </div>
+
+        <button onClick={screenCandidate} disabled={screeningBusy} className="btn-execute">
+          {screeningBusy ? 'Evaluando expediente con IA…' : `Evaluar expediente de ${screeningCandidateName.split(' ')[0]}`}
+        </button>
+
+        {screeningResult&&<div className="screening-decision-card" aria-live="polite">
+          <div className="decision-header">
+            <div>
+              <span className="eyebrow">DICTAMEN OFICIAL DEL AGENTE</span>
+              <h4>Postulante: <strong>{screeningResult.candidateName ?? screeningCandidateName}</strong></h4>
+            </div>
+            <span className={`decision-badge ${screeningResult.category === 'Top Tier' ? 'badge-top' : screeningResult.category === 'Standard' ? 'badge-standard' : 'badge-rejected'}`}>
+              {screeningResult.category === 'Top Tier' ? '★ TOP TIER' : screeningResult.category === 'Standard' ? '● STANDARD' : '✕ RECHAZADO'}
+            </span>
+          </div>
+
+          <p className="decision-recommendation">{screeningResult.recommendation ?? screeningResult.error}</p>
+
+          {screeningResult.analysis && (
+            <div className="criteria-breakdown">
+              <h5>Desglose explicable de criterios evaluados</h5>
+              <div className="criteria-grid">
+                <div className="criteria-item">
+                  <span className="criteria-title">1. Skills críticas requeridas (Python, FastAPI, SQL)</span>
+                  <div className="skills-tags">
+                    {(screeningResult.analysis.criticalSkillsRequired ?? ['python', 'fastapi', 'sql']).map((skill: string) => {
+                      const matched = (screeningResult.analysis.matchedCriticalSkills ?? []).includes(skill);
+                      return (
+                        <span key={skill} className={`skill-tag ${matched ? 'matched' : 'missing'}`}>
+                          {matched ? `✓ ${skill}` : `✗ ${skill}`}
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <small className="criteria-hint">
+                    {(screeningResult.analysis.matchedCriticalSkills ?? []).length >= 2 ? '✓ Cumple condición: 2 o más habilidades detectadas' : '⚠ Menos de 2 habilidades críticas detectadas'}
+                  </small>
+                </div>
+
+                <div className="criteria-item">
+                  <span className="criteria-title">2. Experiencia laboral comprobada</span>
+                  <b className="criteria-val">{screeningResult.analysis.experienceYears} años</b>
+                  <small className="criteria-hint">
+                    {screeningResult.analysis.experienceYears >= 5 ? '✓ Supera umbral Top Tier (≥ 5 años)' : screeningResult.analysis.experienceYears >= 2 ? '✓ Cumple umbral Standard (≥ 2 años)' : '✕ Insuficiente para avanzar (< 2 años)'}
+                  </small>
+                </div>
+
+                <div className="criteria-item">
+                  <span className="criteria-title">3. Compatibilidad calculada con IA</span>
+                  <div className="score-bar-bg">
+                    <div className="score-bar-fill" style={{ width: `${Math.min(100, Math.max(0, screeningResult.analysis.compatibilityScore))}%` }}></div>
+                  </div>
+                  <b className="criteria-val">{screeningResult.analysis.compatibilityScore}%</b>
+                  <small className="criteria-hint">
+                    {screeningResult.analysis.compatibilityScore >= 85 ? '✓ Supera umbral Top Tier (≥ 85%)' : screeningResult.analysis.compatibilityScore >= 60 ? '✓ Cumple umbral Standard (≥ 60%)' : '✕ Inferior a compatibilidad mínima (< 60%)'}
+                  </small>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="decision-footer">
+            <button type="button" className="btn-json" onClick={()=>setScreeningShowJson(v=>!v)}>
+              {screeningShowJson ? 'Ocultar JSON técnico' : 'Ver JSON técnico (REST /screen-candidate)'}
+            </button>
+            {screeningShowJson&&<pre>{JSON.stringify(screeningResult,null,2)}</pre>}
+          </div>
         </div>}
       </section>}
     </div>

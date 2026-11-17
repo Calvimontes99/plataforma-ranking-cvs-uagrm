@@ -385,10 +385,13 @@ services:
     container_name: recruitment-api-gateway
     restart: unless-stopped
     ports:
-      - "${GATEWAY_PORT:-8080}:80"
+      - "80:80"
+      - "8080:80"
+      - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.azure.conf:/etc/nginx/nginx.conf:ro
       - ./landing:/usr/share/nginx/landing:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     depends_on:
       keycloak:
         condition: service_healthy
