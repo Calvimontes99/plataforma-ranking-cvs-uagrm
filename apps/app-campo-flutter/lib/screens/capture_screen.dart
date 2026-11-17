@@ -93,7 +93,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     apiClient = IngestionApiClient(
       baseUrl: const String.fromEnvironment(
         'GATEWAY_URL',
-        defaultValue: 'http://10.0.2.2:8080',
+        defaultValue: 'https://cv-talento-uagrm.westus2.cloudapp.azure.com',
       ),
     );
     _loadFcmToken();
@@ -252,7 +252,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         setState(() {
           status = result.failures.isEmpty
               ? '${result.synchronized} registros sincronizados con Azure sin duplicados'
-              : '${result.synchronized} sincronizados; ${result.failures.length} quedan en cola';
+              : '${result.synchronized} sincronizados; ${result.failures.length} en cola (${result.failures.first.message})';
         });
       }
     } catch (error) {

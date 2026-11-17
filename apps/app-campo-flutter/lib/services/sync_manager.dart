@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
@@ -21,7 +22,7 @@ class IngestionApiClient {
     final documentPath = capture.attachmentPath;
     final photoPath = capture.imagePath;
     final filePath = documentPath?.isNotEmpty == true ? documentPath : photoPath;
-    final hasFile = filePath?.isNotEmpty == true;
+    final hasFile = filePath?.isNotEmpty == true && File(filePath!).existsSync();
     final uri = Uri.parse(
       hasFile
           ? '$_baseUrl/api/v1/ingestion/cvs/upload'
@@ -35,9 +36,9 @@ class IngestionApiClient {
 
     if (hasFile) {
       final isDocument = documentPath?.isNotEmpty == true;
-      final fileName = isDocument ? capture.attachmentName ?? 'cv' : 'candidate-photo${_extension(photoPath)}';
+      final fileName = isDocument ? capture.attachmentName ?? 'cv.pdf' : 'candidate-photo${_extension(photoPath)}';
       final contentType = isDocument
-          ? capture.attachmentContentType ?? 'application/octet-stream'
+          ? _detectContentType(documentPath, capture.attachmentContentType)
           : _imageContentType(photoPath);
       final request = http.MultipartRequest('POST', uri)
         ..headers.addAll(headers);
@@ -52,7 +53,7 @@ class IngestionApiClient {
       });
       request.files.add(await http.MultipartFile.fromPath(
         'file',
-        filePath!,
+        filePath,
         filename: fileName,
         contentType: MediaType.parse(contentType),
       ));
@@ -89,6 +90,20 @@ class IngestionApiClient {
         '.webp' => 'image/webp',
         _ => 'image/jpeg',
       };
+
+  String _detectContentType(String? path, String? fallback) {
+    if (fallback != null && fallback.isNotEmpty && fallback != 'application/octet-stream') {
+      return fallback;
+    }
+    final ext = _extension(path).toLowerCase();
+    return switch (ext) {
+      '.pdf' => 'application/pdf',
+      '.docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.png' => 'image/png',
+      '.webp' => 'image/webp',
+      _ => 'image/jpeg',
+    };
+  }
 
   void close() => _client.close();
 }
