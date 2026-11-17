@@ -128,6 +128,7 @@ services:
       - "${KEYCLOAK_PORT:-8081}:8080"
     volumes:
       - ./keycloak/realm-recruitment.json:/opt/keycloak/data/import/realm-recruitment.json:ro
+      - ./keycloak/themes/recruitment:/opt/keycloak/themes/recruitment:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -187,11 +188,14 @@ services:
       NODE_ENV: production
       PORT: 3000
       GRPC_PORT: 9091
-      MONGODB_URI: mongodb://${MONGO_ROOT_USER:-platform_admin}:${MONGO_ROOT_PASSWORD:-platform_admin_dev}@mongodb:27017/${MONGO_DATABASE:-ingestion_db}?authSource=admin&replicaSet=rs0
+      MONGODB_URI: ${MS_INGESTA_MONGODB_URI:-mongodb://platform_admin:platform_admin_dev@mongodb:27017/ingestion_db?authSource=admin&replicaSet=rs0}
       RABBITMQ_URL: amqp://${RABBITMQ_USER:-platform_user}:${RABBITMQ_PASSWORD:-platform_dev}@rabbitmq:5672/${RABBITMQ_VHOST:-recruitment}
       RABBITMQ_EXCHANGE: recruitment.events
       RABBITMQ_SAGA_QUEUE: ingesta.saga.commands
       AI_NODE_GRPC_URL: ${AI_NODE_GRPC_URL:-ai-node:50051}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+      NOTIFICATIONS_QUEUE: notifications.events
       MS_RANKING_GRPC_URL: ${MS_RANKING_GRPC_URL:-ms-ranking:50052}
       OUTBOX_POLL_INTERVAL_MS: ${OUTBOX_POLL_INTERVAL_MS:-1000}
     ports:

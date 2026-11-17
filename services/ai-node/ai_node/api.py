@@ -6,9 +6,10 @@ import time
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ai_node import __version__
+from ai_node.candidate_screening import CandidateScreeningAgent
 from ai_node.inference import MAX_DOCUMENT_BYTES, AiInference, stable_document_id
 from ai_node.orchestrator import MissionGuardrailError, McpMissionOrchestrator
 
@@ -54,6 +55,20 @@ class ClusterBody(ApiModel):
 class VideoAnalysisBody(ApiModel):
     content_base64: str = Field(alias="contentBase64")
     content_type: str = Field(default="video/mp4", alias="contentType", max_length=128)
+
+
+class CandidateScreeningBody(ApiModel):
+    skills: list[str] = Field(default_factory=list, max_length=30)
+    experience_years: float = Field(alias="experienceYears", ge=0, le=80)
+    compatibility_score: float = Field(alias="compatibilityScore", ge=0, le=100)
+
+    @field_validator("skills")
+    @classmethod
+    def clean_skills(cls, value: list[str]) -> list[str]:
+        cleaned = [skill.strip() for skill in value]
+        if any(not skill or len(skill) > 100 for skill in cleaned):
+            raise ValueError("Cada skill debe contener entre 1 y 100 caracteres")
+        return cleaned
 
 
 def _decode_content(content_base64: str | None, text: str | None) -> bytes:
@@ -164,3 +179,9 @@ async def execute_mission(body: dict[str, Any], request: Request) -> dict[str, A
         return await request.app.state.orchestrator.execute(body, authorization=auth_header)
     except MissionGuardrailError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/api/v1/agents/screen-candidate")
+async def screen_candidate(body: CandidateScreeningBody, request: Request) -> dict[str, Any]:
+    agent: CandidateScreeningAgent = request.app.state.candidate_screening_agent
+    return agent.screen(body.skills, body.experience_years, body.compatibility_score)

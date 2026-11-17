@@ -1,6 +1,6 @@
 import { useLazyQuery, useQuery } from '@apollo/client';
-import { useState } from 'react';
-import { CANDIDATES, postJson, VACANCIES } from './api/client';
+import { useEffect, useState } from 'react';
+import { CANDIDATES, postJson, VACANCIES, watchPlatformEvents } from './api/client';
 import { keycloak } from './auth/keycloak';
 
 type Vacancy = { id:string; titulo:string; cupoDisponible:number; estado:string };
@@ -46,7 +46,7 @@ export function App() {
   const token = (keycloak.tokenParsed ?? {}) as { preferred_username?: string; realm_access?: { roles?: string[] } };
   const roles = token.realm_access?.roles ?? [];
   const username = (token.preferred_username ?? '').toLowerCase();
-  const isDocente = username.startsWith('docente') || (roles.includes('AI_AGENT') && !roles.includes('RRHH'));
+  const isDocente = roles.includes('AI_AGENT') && !roles.includes('RRHH') && !roles.includes('ADMIN');
   const isAi = isDocente;
   const isRrhh = !isDocente;
   const route = isDocente ? '/erp/ia' : '/erp/rrhh';
@@ -60,6 +60,22 @@ export function App() {
   const [missionResult, setMissionResult] = useState<any>();
   const [showJson, setShowJson] = useState(false);
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!isRrhh) return;
+    const controller = new AbortController();
+    void watchPlatformEvents(() => {
+      void vacancies.refetch();
+      if (selectedVacancy && candidates.called) {
+        void loadCandidates({ variables: { vacanteId: selectedVacancy }, fetchPolicy: 'network-only' });
+      }
+    }, controller.signal);
+    return () => controller.abort();
+  }, [isRrhh, selectedVacancy, candidates.called, vacancies.refetch, loadCandidates]);
+  const [screeningSkills, setScreeningSkills] = useState('Python, FastAPI, SQL');
+  const [screeningExperience, setScreeningExperience] = useState('6');
+  const [screeningScore, setScreeningScore] = useState('92');
+  const [screeningBusy, setScreeningBusy] = useState(false);
+  const [screeningResult, setScreeningResult] = useState<any>();
 
   async function selectVacancy(id:string) { setSelectedVacancy(id); setCandidate(undefined); setSteps([]); setMissionResult(undefined); setShowJson(false); await loadCandidates({variables:{vacanteId:id}}); }
   async function runSaga(forceRollback=false) {
@@ -91,6 +107,21 @@ export function App() {
     }
   }
 
+  async function screenCandidate() {
+    setScreeningBusy(true);
+    try {
+      setScreeningResult(await postJson('/api/v1/agents/screen-candidate', {
+        skills: screeningSkills.split(',').map(skill => skill.trim()).filter(Boolean),
+        experienceYears: Number(screeningExperience),
+        compatibilityScore: Number(screeningScore),
+      }));
+    } catch (error) {
+      setScreeningResult({ error: String(error) });
+    } finally {
+      setScreeningBusy(false);
+    }
+  }
+
   const criticalVacancies: any[] = missionResult?.steps?.[0]?.result?.vacantesCriticas ?? [];
   const discoveredCvs: any[] = missionResult?.steps?.[1]?.result?.candidates ?? [];
   const shortlist: any[] = missionResult?.candidateShortlist ?? [];
@@ -99,7 +130,7 @@ export function App() {
   const auditInfo = missionResult?.steps?.[3]?.audit;
 
   return <main>
-    <header><div><small>RECRUITMENT OS · {token.preferred_username??'usuario'} · {isDocente?'Docente (IA)':'RRHH'}</small><h1>{isRrhh?'Centro de mando RRHH':'Centro de IA · Agentes'}</h1></div><nav><a href="/bi/">BI y reportes</a><a href="/portal/">Portal postulante</a><button onClick={()=>keycloak.logout({redirectUri:location.origin+'/layout/'})}>Salir</button></nav></header>
+    <header><div><small>RECRUITMENT OS · {token.preferred_username??'usuario'} · {isDocente?'Docente (IA)':'RRHH'}</small><h1>{isRrhh?'Centro de mando RRHH':'Centro de IA · Agentes'}</h1></div><nav><a href="/bi/">BI y reportes</a><a href="/portal/?switch-account=1">Portal postulante</a><button onClick={()=>keycloak.logout({redirectUri:location.origin+'/layout/'})}>Salir</button></nav></header>
     {isRrhh&&<section className="hero"><div><span className="eyebrow">ERP · GraphQL selectivo</span><h2>Decisiones de talento, con trazabilidad completa.</h2><p>La tabla solicita únicamente los campos visibles. Sin payloads REST sobredimensionados.</p></div><div className="metric"><b>{vacancies.data?.vacantesAbiertas.length??0}</b><span>vacantes abiertas</span></div></section>}
     {isAi&&<section className="hero"><div><span className="eyebrow">IA · Agentes MCP</span><h2>Evaluación inteligente de candidatos.</h2><p>El agente revisa vacantes críticas, busca CVs afines en el histórico, recalcula el ranking con IA y propone una terna con agenda de entrevistas.</p></div><div className="metric"><b>3</b><span>herramientas MCP</span></div></section>}
     <div className="grid">
@@ -200,6 +231,25 @@ export function App() {
               <pre>{JSON.stringify(missionResult, null, 2)}</pre>
             </div>}
           </div>
+        </div>}
+      </section>}
+      {isAi&&<section className="card agent wide screening-agent">
+        <span className="eyebrow">AGENTE INDEPENDIENTE · SCREENING</span>
+        <h3>Evaluación individual de postulación</h3>
+        <p>Clasifica una candidatura por skills críticas, experiencia y puntaje de compatibilidad. Umbrales: Top Tier ≥ 85% y 5 años; Standard ≥ 60% y 2 años.</p>
+        <div className="screening-form">
+          <label>Skills (separadas por coma)<input value={screeningSkills} onChange={event => setScreeningSkills(event.target.value)} /></label>
+          <label>Años de experiencia<input type="number" min="0" max="80" step="0.5" value={screeningExperience} onChange={event => setScreeningExperience(event.target.value)} /></label>
+          <label>Compatibilidad (%)<input type="number" min="0" max="100" step="1" value={screeningScore} onChange={event => setScreeningScore(event.target.value)} /></label>
+        </div>
+        <button onClick={screenCandidate} disabled={screeningBusy}>{screeningBusy ? 'Evaluando…' : 'Ejecutar CandidateScreeningAgent'}</button>
+        {screeningResult&&<div className="screening-result" aria-live="polite">
+          <div><span className={`badge ${screeningResult.category === 'Top Tier' ? 'ok' : screeningResult.category === 'Rechazado' || screeningResult.error ? 'warn' : ''}`}>{screeningResult.category ?? 'Error'}</span>
+            <p>{screeningResult.recommendation ?? screeningResult.error}</p>
+            {screeningResult.analysis&&<small>Skills críticas: {screeningResult.analysis.matchedCriticalSkills.join(', ') || 'ninguna'} · Experiencia: {screeningResult.analysis.experienceYears} años · Compatibilidad: {screeningResult.analysis.compatibilityScore}%</small>}
+          </div>
+          <button type="button" className="btn-json" onClick={()=>setShowJson(value=>!value)}>{showJson ? 'Ocultar JSON' : 'Ver JSON'}</button>
+          {showJson&&<pre>{JSON.stringify(screeningResult,null,2)}</pre>}
         </div>}
       </section>}
     </div>

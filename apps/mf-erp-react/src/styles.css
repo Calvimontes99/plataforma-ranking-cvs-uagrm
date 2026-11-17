@@ -41,8 +41,16 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 .step.done i { background: #20a477; }.step.running i { background: #e6a23c; }.step.failed i { background: #c94f43; }.step.compensated i { background: #7357b7; }
 .agent { grid-column: 1 / -1; background: #142334; color: #e8f0f7; border-color: #263d55; }
 .agent textarea { width: 100%; min-height: 84px; background: #1d3448; color: white; border: 1px solid #47627b; border-radius: 10px; padding: 13px; font: inherit; line-height: 1.5; }
+.screening-agent > p { color: #b9c9d8; line-height: 1.5; }
+.screening-form { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 14px; margin: 16px 0; }
+.screening-form label { display: grid; gap: 7px; color: #cbd5e1; font-size: .85rem; font-weight: 700; }
+.screening-form input { min-width: 0; border: 1px solid #47627b; border-radius: 9px; padding: 11px; background: #1d3448; color: white; font: inherit; }
+.screening-result { display: flex; justify-content: space-between; align-items: start; gap: 16px; flex-wrap: wrap; margin-top: 20px; padding: 16px; border: 1px solid #2d4761; border-radius: 12px; background: #1b2f44; }
+.screening-result p { margin: 10px 0 6px; color: #f8fafc; }
+.screening-result small { color: #94a3b8; }
+.screening-result pre { flex-basis: 100%; max-height: 240px; overflow: auto; color: #9fe1c7; background: #0d1b29; border-radius: 10px; padding: 14px; }
 .skills { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0; }.skills span { padding: 7px 10px; background: #254157; border-radius: 20px; color: #b9d1df; font: .78rem ui-monospace, monospace; }.agent pre { max-height: 280px; overflow: auto; color: #9fe1c7; background: #0d1b29; border-radius: 10px; padding: 14px; }.empty { color: #718198; }
-@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .hero { align-items: start; flex-direction: column; } header { align-items: start; flex-direction: column; } .metric { text-align: left; } }
+@media (max-width: 800px) { .grid { grid-template-columns: 1fr; } .hero { align-items: start; flex-direction: column; } header { align-items: start; flex-direction: column; } .metric { text-align: left; } .screening-form { grid-template-columns: 1fr; } }
 
 .result-panel.light { margin-top: 16px; padding: 14px 16px; background: #f7f9fb; border: 1px solid #d9e1eb; border-radius: 12px; }
 .result-panel.light pre { margin-top: 12px; max-height: 240px; overflow: auto; background: #0d1b29; color: #9fe1c7; padding: 12px; border-radius: 10px; font-size: .8rem; }

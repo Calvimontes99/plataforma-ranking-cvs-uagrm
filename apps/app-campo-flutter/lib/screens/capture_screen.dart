@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:uuid/uuid.dart';
@@ -9,6 +10,7 @@ import 'package:uuid/uuid.dart';
 import '../models/candidate_capture.dart';
 import '../services/cv_inference_service.dart';
 import '../services/local_database.dart';
+import '../services/local_candidate_agent.dart';
 import '../services/push_notification_service.dart';
 import '../services/sync_manager.dart';
 
@@ -23,10 +25,12 @@ class _CaptureScreenState extends State<CaptureScreen> {
   final name = TextEditingController();
   final vacancy = TextEditingController();
   final inference = CvInferenceService();
+  final localAgent = const LocalCandidateAgent();
   late final IngestionApiClient apiClient;
   late final SyncManager sync;
   late final Connectivity connectivity;
   StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
+  StreamSubscription<String>? tokenRefreshSubscription;
 
   String? image;
   PlatformFile? selectedDocument;
@@ -35,11 +39,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
   String status = 'Listo para trabajar sin conexión';
   String? fcmToken;
   bool syncing = false;
+  String get devicePlatform => defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
+  LocalCandidateAssessment get liveAssessment => localAgent.assess(
+        name: name.text,
+        imagePath: image,
+        documentPath: selectedDocument?.path,
+        cvScore: cvScore,
+        interviewScore: interview,
+      );
 
   @override
   void initState() {
     super.initState();
-    _loadFcmToken();
     inference.initialize();
     connectivity = Connectivity();
     apiClient = IngestionApiClient(
@@ -48,6 +59,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
         defaultValue: 'http://10.0.2.2:8080',
       ),
     );
+    _loadFcmToken();
     sync = SyncManager(
       apiClient: apiClient,
       database: LocalDatabase.instance,
@@ -64,11 +76,14 @@ class _CaptureScreenState extends State<CaptureScreen> {
       final push = PushNotificationService.instance;
       final token = await push.getToken();
       if (mounted) setState(() => fcmToken = token);
-      // TODO(auth/backend): register this token after recruiter login, e.g.
-      // POST /api/devices with {token, platform, userId}. Never log it in prod.
-      push.onTokenRefresh.listen((newToken) {
+      if (token != null && token.isNotEmpty) {
+        await apiClient.registerDeviceToken(token, platform: devicePlatform);
+      }
+      tokenRefreshSubscription = push.onTokenRefresh.listen((newToken) {
         if (mounted) setState(() => fcmToken = newToken);
-        // Forward refreshed token to the authenticated backend here too.
+        unawaited(apiClient.registerDeviceToken(newToken, platform: devicePlatform).catchError((error) {
+          debugPrint('FCM token registration failed: $error');
+        }));
       });
     } catch (error) {
       debugPrint('FCM token unavailable: $error');
@@ -85,6 +100,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
     final score = await inference.classify(photo.path);
     setState(() {
       image = photo.path;
+      selectedDocument = null;
       cvScore = score;
       status = 'Análisis TFLite local: ${(score * 100).round()}% CV';
     });
@@ -112,6 +128,8 @@ class _CaptureScreenState extends State<CaptureScreen> {
       }
 
       setState(() {
+        image = null;
+        cvScore = 0;
         selectedDocument = file;
         status = 'Archivo listo para guardar: ${file.name}';
       });
@@ -161,15 +179,16 @@ class _CaptureScreenState extends State<CaptureScreen> {
     setState(() {
       image = null;
       selectedDocument = null;
-    });
-    final connectivityResults = await connectivity.checkConnectivity();
-    if (!connectivityResults.contains(ConnectivityResult.none)) {
-      unawaited(Future<void>.delayed(const Duration(milliseconds: 300))
-          .then((_) => synchronize()));
-    }
-    setState(() {
       status = 'Guardado en SQLite. Se sincronizará al recuperar conexión.';
     });
+    try {
+      final connectivityResults = await connectivity.checkConnectivity();
+      if (mounted && !connectivityResults.contains(ConnectivityResult.none)) {
+        await synchronize();
+      }
+    } catch (_) {
+      // Keep the SQLite queue when network state cannot be determined.
+    }
   }
 
   Future<void> synchronize() async {
@@ -217,6 +236,7 @@ class _CaptureScreenState extends State<CaptureScreen> {
           const SizedBox(height: 20),
           TextField(
             controller: name,
+            onChanged: (_) => setState(() {}),
             decoration: const InputDecoration(
               labelText: 'Nombre del candidato',
             ),
@@ -263,6 +283,18 @@ class _CaptureScreenState extends State<CaptureScreen> {
             max: 100,
             onChanged: (value) => setState(() => interview = value),
           ),
+          Card(
+            color: liveAssessment.status == FieldCandidateStatus.suitable
+                ? Colors.green.shade50
+                : Colors.orange.shade50,
+            child: ListTile(
+              leading: Icon(liveAssessment.status == FieldCandidateStatus.suitable
+                  ? Icons.check_circle_outline
+                  : Icons.rule_folder_outlined),
+              title: Text('Pre-evaluación local: ${liveAssessment.label}'),
+              subtitle: Text(liveAssessment.reasons.join(' ')),
+            ),
+          ),
           FilledButton(
             onPressed: save,
             child: const Text('Guardar localmente'),
@@ -295,6 +327,9 @@ class _CaptureScreenState extends State<CaptureScreen> {
   void dispose() {
     if (connectivitySubscription != null) {
       unawaited(connectivitySubscription!.cancel());
+    }
+    if (tokenRefreshSubscription != null) {
+      unawaited(tokenRefreshSubscription!.cancel());
     }
     name.dispose();
     vacancy.dispose();

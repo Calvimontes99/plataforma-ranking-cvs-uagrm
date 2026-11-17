@@ -4,6 +4,7 @@ import { CURRICULUM_REPOSITORY, IDEMPOTENCY, OUTBOX_REPOSITORY, POSTULACION_REPO
 import {
   CurriculumRecord, CurriculumSchema, IdempotencyRecord, IdempotencyRecordSchema,
   OutboxEventRecord, OutboxEventSchema, PostulacionRecord, PostulacionSchema,
+  DeviceTokenRecord, DeviceTokenSchema,
 } from './schemas';
 import { MongoCurriculumRepository, MongoIdempotencyAdapter, MongoOutboxRepository, MongoPostulacionRepository } from './repository.adapters';
 import { MongoSessionContext } from './mongo-session-context';
@@ -15,6 +16,7 @@ import { MongoUnitOfWork } from './mongo-unit-of-work';
     { name: PostulacionRecord.name, schema: PostulacionSchema },
     { name: OutboxEventRecord.name, schema: OutboxEventSchema },
     { name: IdempotencyRecord.name, schema: IdempotencyRecordSchema },
+    { name: DeviceTokenRecord.name, schema: DeviceTokenSchema },
   ])],
   providers: [
     MongoSessionContext, MongoUnitOfWork,

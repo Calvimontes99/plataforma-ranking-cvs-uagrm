@@ -47,7 +47,13 @@ the build.
 - `POST /api/v1/ai/predict-compatibility`
 - `POST /api/v1/ai/cluster-talent`
 - `POST /api/v1/ai/analyze-video`
+- `POST /api/v1/agents/screen-candidate` — evaluates `skills`, `experienceYears`, and `compatibilityScore` (0–100) using independent CandidateScreeningAgent thresholds.
 - `POST /agents/execute-mission`
+
+Candidate screening classifies as Top Tier at 85% compatibility, 5+ years of
+experience, and at least two critical skills (Python, FastAPI, SQL); Standard
+requires at least 60% and 2+ years. Other applications are rejected. The
+endpoint is also exposed to the ERP through the API gateway.
 
 The mission orchestrator discovers MCP tools and ingestion resources before
 calling tools in vacancy → historical-candidate-search → ranking order. It
